@@ -2,7 +2,14 @@
 A SeqWare workflow that wraps the Broad workflow.
 
 ## How to use
-Run this workflow in seqware\_whitestar\_pancancer like this:
+Ensure that the machine you are running this one has the docker images necessary for running Broad saved as tar files in the directory `/workflows/gitroot/pcawg_tools`.
+
+You will also need to generate the `pcawg_data.service` file (using the script `$PCAWG_DIR/scripts/pcawg_wf_gen.py`) on this path:
+
+`/workflows/gitroot/pcawg_tools/pcawg_data.service`
+
+Then, you can run this workflow like this:
+
 
 ```
 docker run --rm -h master -v /var/run/docker.sock:/var/run/docker.sock \
