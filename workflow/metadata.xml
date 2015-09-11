@@ -1,0 +1,9 @@
+<bundle version="0.0.1-SNAPSHOT">
+  <workflow name="BroadWrapper" version="${workflow-version}" seqware_version="${seqware-version}"
+  basedir="${workflow_bundle_dir}/Workflow_Bundle_BroadWrapper/${workflow-version}">
+    <description>${workflow-description}</description>
+    <workflow_class path="${workflow_bundle_dir}/Workflow_Bundle_BroadWrapper/${workflow-version}/classes/io/seqware/pancancer/BroadWrapperWorkflow.java"/>
+    <config path="${workflow_bundle_dir}/Workflow_Bundle_BroadWrapper/${workflow-version}/config/BroadWrapperWorkflow.ini"/>
+    <requirements compute="single" memory="20M" network="local"  workflow_engine="Oozie" workflow_type="java"/>
+  </workflow>
+</bundle>
