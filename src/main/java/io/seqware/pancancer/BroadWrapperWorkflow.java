@@ -17,7 +17,7 @@ import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
  */
 public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
-    private String jobsDir;
+    //private String jobsDir;
     private String workflowID;
     private String workflowDir;
     private boolean cleanup;
@@ -27,13 +27,13 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private void init() {
         try {
             
-            if (hasPropertyAndNotNull("jobs_dir")){
-                this.jobsDir = getProperty("jobs_dir");
-            }
-            else
-            {
-                throw new RuntimeException("\"jobs_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }
+//            if (hasPropertyAndNotNull("jobs_dir")){
+//                this.jobsDir = getProperty("jobs_dir");
+//            }
+//            else
+//            {
+//                throw new RuntimeException("\"jobs_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+//            }
 
             if (hasPropertyAndNotNull("workflow_dir")){
                 this.workflowDir = getProperty("workflow_dir");
@@ -71,17 +71,17 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         }
     }
 
-    @Override
-    public void setupDirectory() {
-        // since setupDirectory is the first method run, we use it to initialize variables too.
-        init();
-        // creates a dir1 directory in the current working directory where the workflow runs
-        this.addDirectory(jobsDir);
-    }
+//    @Override
+//    public void setupDirectory() {
+//        // since setupDirectory is the first method run, we use it to initialize variables too.
+//        init();
+//        // creates a dir1 directory in the current working directory where the workflow runs
+//        this.addDirectory(jobsDir);
+//    }
 
     @Override
     public void buildWorkflow() {
-
+        this.init();
         // TODO: Add a bash job to check that the workflow file actually exists where it is supposed to and returns an error code if it does not.
         // The Broad scripts may fail if the file does not exist, but they may
         // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
@@ -94,19 +94,19 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // so SeqWare might "succeed" even when Broad fails.
     }
     
-    private void cleanupWorkflow(Job... lastJobs) {
-        Job cleanupJob = null;
-        if (cleanup) {
-            cleanupJob = this.getWorkflow().createBashJob("cleanup");
-            // Clean up the jobsDir 
-            cleanupJob.getCommand().addArgument("rm -Rf "+this.jobsDir+" \n");
-        }
-        for (Job lastJob : lastJobs) {
-            if (lastJob != null && cleanupJob != null) {
-                cleanupJob.addParent(lastJob);
-            }
-        }
-    }
+//    private void cleanupWorkflow(Job... lastJobs) {
+//        Job cleanupJob = null;
+//        if (cleanup) {
+//            cleanupJob = this.getWorkflow().createBashJob("cleanup");
+//            // Clean up the jobsDir 
+//            cleanupJob.getCommand().addArgument("rm -Rf "+this.jobsDir+" \n");
+//        }
+//        for (Job lastJob : lastJobs) {
+//            if (lastJob != null && cleanupJob != null) {
+//                cleanupJob.addParent(lastJob);
+//            }
+//        }
+//    }
     
  
     private Job runBroadWorkflow(String workflowID/*, Job previousJob*/)
