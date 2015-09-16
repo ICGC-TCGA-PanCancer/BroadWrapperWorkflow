@@ -86,12 +86,19 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // The Broad scripts may fail if the file does not exist, but they may
         // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
         
-        Job runBroad = this.runBroadWorkflow(this.workflowID);
+        // Generate workflow files. Yes, we are generating for ALL that are registered for the user with synapse credentials in this machine, but this
+        // is not a very expensive step with no side-effects and the INI will specify exactly which INI to use.
+        Job generateJobs = this.generateWorkflowFilesJob();
+        
+        // Run the workflow.
+        Job runBroad = this.runBroadWorkflow(this.workflowID,generateJobs);
         //cleanupWorkflow(runBroad);
         
         // TODO: Maybe  have a post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output?
         // It seems like a lot of Broad scripts will exit with code 0 even if they encountered an error (missing input file, HTTP timeout, etc...) and ended
         // so SeqWare might "succeed" even when Broad fails.
+        
+        // TODO: Upload steps! Not yet certain if there will be one upload script wrapping the other steps, or if this workflow will call them all separately.
     }
     
 //    private void cleanupWorkflow(Job... lastJobs) {
@@ -109,7 +116,15 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 //    }
     
  
-    private Job runBroadWorkflow(String workflowID/*, Job previousJob*/)
+    private Job generateWorkflowFilesJob()
+    {
+        Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
+        generateWFFilesJob.getCommand().addArgument("$PCAWG_DIR/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir);
+        
+        return generateWFFilesJob;
+    }
+    
+    private Job runBroadWorkflow(String workflowID, Job previousJob)
     {
         //Need to execute: qsub sge_qsub_runworkflow.sh pcawg_data.service pcawg_data.tasks/<workflow_id_fill_in>
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
@@ -127,7 +142,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
                                                             // Mount the directory with the work that needs to be done.
                                                             +" -v " + this.workflowDir+":/tasks "
                                                             + this.pcawgContainerName+" /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service /tasks/"+workflowID);
-        //runBroadJob.addParent(previousJob);
+        runBroadJob.addParent(previousJob);
         
         return runBroadJob;
     }
