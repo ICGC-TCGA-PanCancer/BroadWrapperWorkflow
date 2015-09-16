@@ -22,6 +22,7 @@ WORKDIR /workflows/gitroot
 RUN git clone https://github.com/ucscCancer/pcawg_tools.git && \
     cd pcawg_tools && \
     git checkout 1.0.0
+WORKDIR /workflows/gitroot
 RUN git clone https://github.com/kellrott/nebula.git
 
 # Set up environment variables
@@ -35,7 +36,8 @@ RUN curl -sSL https://get.docker.com/ | sh
 RUN mv /workflows/gitroot/pcawg_tools/images /workflows/gitroot/pcawg_tools/old_images
 WORKDIR /workflows/gitroot/pcawg_tools
 # The pcawg tools actually expect nebual to be in $PCAWG_DIR, although some of the docs suggest installing nebula into /workflows/gitroot, so just symlink it here.
-RUN ln -s ../nebula nebula
+#RUN ln -s ../nebula nebula
+#RUN ln -s ../workflows workflows
 
 #####################
 # Set up the workflow
@@ -52,5 +54,6 @@ WORKDIR /workflow-src
 RUN mvn clean package
 RUN cp -R target/Workflow_Bundle_BroadWrapper* /workflows/BroadWrapperWorkflow
 RUN rm -rf target/*
+#ENV SEQWARE_ROOT true
 USER seqware
-WORKDIR /home/seqware
+WORKDIR /workflows/gitroot/pcawg_tools
