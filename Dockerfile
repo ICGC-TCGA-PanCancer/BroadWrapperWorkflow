@@ -39,7 +39,7 @@ RUN curl -sSL https://get.docker.com/ | sh
 RUN mv /workflows/gitroot/pcawg_tools/images /workflows/gitroot/pcawg_tools/old_images
 WORKDIR /workflows/gitroot/pcawg_tools
 # The pcawg tools actually expect nebual to be in $PCAWG_DIR, although some of the docs suggest installing nebula into /workflows/gitroot, so just symlink it here.
-#RUN ln -s ../nebula nebula
+RUN ln -s ../nebula nebula
 #RUN ln -s ../workflows workflows
 
 #####################
