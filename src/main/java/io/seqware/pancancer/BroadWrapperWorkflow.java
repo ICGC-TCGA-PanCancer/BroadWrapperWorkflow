@@ -21,6 +21,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private String workflowID;
     private String workflowDir;
     private boolean cleanup;
+    private boolean checkWorkflowFileExists = false;
 
     private String pcawgContainerName ;
 
@@ -58,6 +59,11 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             {
                 throw new RuntimeException("\"container_name\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
             }            
+            
+            //This is optional - if the user doesn't specify, we'll skip the check.
+            if (hasPropertyAndNotNull("check_workflowfile_exists")) {
+                this.checkWorkflowFileExists = Boolean.valueOf( getProperty("check_workflowfile_exists") );
+            }
 //            if (hasPropertyAndNotNull("pcawg_dir")){
 //                this.pcawgDir = getProperty("pcawg_dir");
 //            }
@@ -90,9 +96,10 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // TODO: Add a bash job to check that the workflow file actually exists where it is supposed to and returns an error code if it does not.
         // The Broad scripts may fail if the file does not exist, but they may
         // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
+        Job checkforWFFile = this.checkForWorkflowFile(this.workflowID, generateJobs);
         
         // Run the workflow.
-        Job runBroad = this.runBroadWorkflow(this.workflowID,generateJobs);
+        Job runBroad = this.runBroadWorkflow(this.workflowID, checkforWFFile);
         //cleanupWorkflow(runBroad);
         
         // TODO: Maybe  have a post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output?
@@ -100,6 +107,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // so SeqWare might "succeed" even when Broad fails.
         
         // TODO: Upload steps! Not yet certain if there will be one upload script wrapping the other steps, or if this workflow will call them all separately.
+        
     }
     
 //    private void cleanupWorkflow(Job... lastJobs) {
@@ -120,7 +128,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private Job generateWorkflowFilesJob()
     {
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
-        generateWFFilesJob.getCommand().addArgument("/workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir);
+        generateWFFilesJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir + " ) ");
         
         return generateWFFilesJob;
     }
@@ -146,5 +154,26 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         runBroadJob.addParent(previousJob);
         
         return runBroadJob;
+    }
+    
+    private Job checkForWorkflowFile(String workflowID, Job previousJob)
+    {
+        Job checkForWorkflowFileJob = this.getWorkflow().createBashJob("check_that_workflow_file_exists");
+        // stat will terminate with exit code "1" if the file is not found.
+        if (this.checkWorkflowFileExists)
+            checkForWorkflowFileJob.getCommand().addArgument("stat "+this.workflowDir+"/"+workflowID);
+        
+        checkForWorkflowFileJob.addParent(previousJob);
+        
+        return checkForWorkflowFileJob;
+    }
+    
+    private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
+    {
+        Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
+        prepareUploadJob.getCommand().addArgument("/workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+"  ids "+workflowID);
+        prepareUploadJob.addParent(previousJob);
+        
+        return prepareUploadJob;
     }
 }

@@ -3,16 +3,15 @@ FROM pancancer/seqware_whitestar_pancancer:1.1.1
 ######################################
 # This part is the PCAWG-tools section
 ######################################
-RUN sudo apt-get update
-RUN sudo apt-get install python wget build-essential python-dev git curl libffi-dev libssl-dev software-properties-common python-software-properties --yes
+USER root
+RUN apt-get update
+RUN apt-get install python wget build-essential python-dev git curl libffi-dev libssl-dev software-properties-common python-software-properties --yes
 
 # Install some python packages via pip
 RUN wget https://bootstrap.pypa.io/get-pip.py && \
-    sudo python get-pip.py
-RUN sudo pip install requests[security]
-RUN sudo pip install synapseclient pandas
-
-USER root
+    python get-pip.py
+RUN pip install requests[security]
+RUN pip install synapseclient pandas
 
 # Setup working directories
 RUN mkdir /workflows && mkdir /workflows/gitroot
@@ -30,7 +29,9 @@ ENV PCAWG_DIR /workflows/gitroot/pcawg_tools
 ENV NEBULA /workflows/gitroot/nebula
 ENV PYTHONPATH $PYTHONPATH:$NEBULA
 
-RUN chmod a+w /workflows/gitroot/pcawg_tools && chmod a+w /workflows/gitroot/nebula
+RUN chmod a+w /workflows && \
+    chmod a+w /workflows/gitroot/pcawg_tools && \
+    chmod a+w /workflows/gitroot/nebula
 
 # Install docker into this container so that it can call other containers.
 RUN curl -sSL https://get.docker.com/ | sh
