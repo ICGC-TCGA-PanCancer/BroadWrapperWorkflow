@@ -44,7 +44,7 @@ $ docker build -t pancancer/pcawg_tools:0.0.1 .
 
 Once everything is set up, you can run this workflow:
 
-
+<!--
 ```
 docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
                           -v /datastore:/datastore \
@@ -54,4 +54,17 @@ docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd)/broad_wrapper.ini:/workflow.ini \
            pancancer/seqware_whitestar_pancancer:1.1.1 \
                 seqware bundle launch --dir /workflows/Workflow_Bundle_BroadWrapper_0.0.1-SNAPSHOT_SeqWare_1.1.1  --engine whitestar --no-metadata --ini /workflow.ini
+```
+-->
+```
+docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
+                          -v /datastore:/datastore \
+                          -v /home/ubuntu/.synapseConfig:/home/seqware/.synapseConfig:ro \
+                          -v /workflows/gitroot/pcawg_tools/images:/workflows/gitroot/pcawg_tools/images:ro \
+                          -v /datastore/pcawg_data.tasks:/workflows/gitroot/pcawg_tools/pcawg_data.tasks \
+                          -v /datastore/pcawg_data.tasks:/tasks \
+                          -v /datastore/broad_refdata:/workflows/gitroot/pcawg_tools/pcawg_data \
+                          -v $(pwd)/test_broad_wrapper.ini:/workflow.ini \
+           pancancer/broad_wrapper_workflow \
+                seqware bundle launch --dir /workflows/BroadWrapperWorkflow  --engine whitestar --no-metadata --ini /workflow.ini
 ```
