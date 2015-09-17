@@ -82,13 +82,14 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     @Override
     public void buildWorkflow() {
         this.init();
-        // TODO: Add a bash job to check that the workflow file actually exists where it is supposed to and returns an error code if it does not.
-        // The Broad scripts may fail if the file does not exist, but they may
-        // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
-        
+       
         // Generate workflow files. Yes, we are generating for ALL that are registered for the user with synapse credentials in this machine, but this
         // is not a very expensive step with no side-effects and the INI will specify exactly which INI to use.
         Job generateJobs = this.generateWorkflowFilesJob();
+
+        // TODO: Add a bash job to check that the workflow file actually exists where it is supposed to and returns an error code if it does not.
+        // The Broad scripts may fail if the file does not exist, but they may
+        // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
         
         // Run the workflow.
         Job runBroad = this.runBroadWorkflow(this.workflowID,generateJobs);
@@ -119,7 +120,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private Job generateWorkflowFilesJob()
     {
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
-        generateWFFilesJob.getCommand().addArgument("$PCAWG_DIR/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir);
+        generateWFFilesJob.getCommand().addArgument("/workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir);
         
         return generateWFFilesJob;
     }

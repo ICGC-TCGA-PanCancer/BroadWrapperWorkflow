@@ -30,6 +30,8 @@ ENV PCAWG_DIR /workflows/gitroot/pcawg_tools
 ENV NEBULA /workflows/gitroot/nebula
 ENV PYTHONPATH $PYTHONPATH:$NEBULA
 
+RUN chmod a+w /workflows/gitroot/pcawg_tools && chmod a+w /workflows/gitroot/nebula
+
 # Install docker into this container so that it can call other containers.
 RUN curl -sSL https://get.docker.com/ | sh
 
@@ -54,6 +56,5 @@ WORKDIR /workflow-src
 RUN mvn clean package
 RUN cp -R target/Workflow_Bundle_BroadWrapper* /workflows/BroadWrapperWorkflow
 RUN rm -rf target/*
-#ENV SEQWARE_ROOT true
 USER seqware
-WORKDIR /workflows/gitroot/pcawg_tools
+WORKDIR /workflows/gitroot/
