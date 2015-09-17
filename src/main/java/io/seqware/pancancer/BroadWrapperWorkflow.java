@@ -1,5 +1,8 @@
 package io.seqware.pancancer;
 
+import java.util.Arrays;
+import java.util.List;
+
 import net.sourceforge.seqware.pipeline.workflowV2.AbstractWorkflowDataModel;
 import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
 
@@ -22,6 +25,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private String workflowDir;
     private boolean cleanup;
     private boolean checkWorkflowFileExists = false;
+    private List<String> uploadSourceDirs = Arrays.asList("muse","broad","broad_tar");
 
     private String pcawgContainerName ;
 
@@ -128,6 +132,8 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private Job generateWorkflowFilesJob()
     {
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
+        // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
+        // spawn a subshell and cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
         generateWFFilesJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir + " ) ");
         
         return generateWFFilesJob;
@@ -139,18 +145,22 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
         
         // This shouldn't need "sudo" but it won't run without it. :/ 
+/*
         runBroadJob.getCommand().addArgument("sudo docker run --rm -h master"
                                                             // Mount the docker socket so that the container can call docker at the top-level
                                                             +" -v /var/run/docker.sock:/var/run/docker.sock "
                                                             // Mount the images directory. This directory contains the TAR files for all of the images necessary for running Broad 
                                                             +" -v /workflows/gitroot/pcawg_tools/images:/workflows/gitroot/pcawg_tools/images:ro "
                                                             // Mount the service config file - needs to be created when generating workflow files, before this step runs!
-                                                            +" -v /workflows/gitroot/pcawg_tools/pcawg_data.service:/workflows/gitroot/pcawg_tools/pcawg_data.service:ro"
+                                                            // NO LONGER NEEDED since workflow file generation now occurs inside the workflow.
+                                                            //+" -v /workflows/gitroot/pcawg_tools/pcawg_data.service:/workflows/gitroot/pcawg_tools/pcawg_data.service:ro"
                                                             // Mount the datastore, datastore will need to contain "nebula/work"; not certain if nebula needs this already to exist, or if it just needs /datastore and will set up its own directories. 
                                                             +" -v /datastore:/datastore "
                                                             // Mount the directory with the work that needs to be done.
                                                             +" -v " + this.workflowDir+":/tasks "
                                                             + this.pcawgContainerName+" /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service /tasks/"+workflowID);
+*/
+        runBroadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service  "+this.workflowDir+"/"+workflowID+" ) ");
         runBroadJob.addParent(previousJob);
         
         return runBroadJob;
@@ -171,9 +181,23 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
     {
         Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
-        prepareUploadJob.getCommand().addArgument("/workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+"  ids "+workflowID);
+        prepareUploadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+" "+workflowID+ " ) ");
         prepareUploadJob.addParent(previousJob);
         
         return prepareUploadJob;
+    }
+    
+    private Job doUpload(String workflowID, Job previousJob)
+    {
+        
+        //TODO: Finish this! Need to call muse/prep.sh, muse/upload.sh, broad/prep.sh, broad/upload.sh, broad_tar/prep.sh, broad_tar/upload.sh for the workflow. 
+        // Need to figure out what the full path to these will be.
+        for (String dir : this.uploadSourceDirs)
+        {
+            Job doUploadJob = this.getWorkflow().createBashJob("do_upload_command_"+dir);
+            doUploadJob.getCommand().addArgument(dir+"/prep.sh");
+            doUploadJob.getCommand().addArgument(dir+"/upload.sh");
+        }
+        return null;
     }
 }
