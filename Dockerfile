@@ -62,13 +62,13 @@ CMD echo "cd; . venv/bin/activate">>~/.bashrc
 # Set up the workflow
 #####################
 
-RUN mkdir /workflows/gitroot/BroadWrapperWorkflow
-COPY src /workflows/gitroot/BroadWrapperWorkflow/src
-COPY workflow /workflows/gitroot/BroadWrapperWorkflow/workflow
-COPY pom.xml /workflows/gitroot/BroadWrapperWorkflow/pom.xml
-COPY workflow.properties /workflows/gitroot/BroadWrapperWorkflow/workflow.properties
-COPY links /workflows/gitroot/BroadWrapperWorkflow/links
-WORKDIR /workflows/gitroot/BroadWrapperWorkflow/
+RUN mkdir -p /home/seqware/gitroot/BroadWrapperWorkflow
+COPY src /home/seqware/gitroot/BroadWrapperWorkflow/src
+COPY workflow /home/seqware/gitroot/BroadWrapperWorkflow/workflow
+COPY pom.xml /home/seqware/gitroot/BroadWrapperWorkflow/pom.xml
+COPY workflow.properties /home/seqware/gitroot/BroadWrapperWorkflow/workflow.properties
+COPY links /home/seqware/gitroot/BroadWrapperWorkflow/links
+WORKDIR /home/seqware/gitroot/BroadWrapperWorkflow/
 RUN mvn clean package
 RUN cp -R target/Workflow_Bundle_BroadWrapper* /workflows/BroadWrapperWorkflow
 RUN rm -rf target/*
