@@ -59,12 +59,9 @@ docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
 ```
 docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
                           -v /datastore:/datastore \
+                          -v /workflows:/workflows \
                           -v /home/ubuntu/.synapseConfig:/home/seqware/.synapseConfig:ro \
-                          -v /workflows/gitroot/pcawg_tools/images:/workflows/gitroot/pcawg_tools/images:ro \
-                          -v /datastore/pcawg_data.tasks:/workflows/gitroot/pcawg_tools/pcawg_data.tasks \
-                          -v /datastore/pcawg_data.tasks:/tasks \
-                          -v /datastore/broad_refdata:/workflows/gitroot/pcawg_tools/pcawg_data \
                           -v $(pwd)/test_broad_wrapper.ini:/workflow.ini \
-           pancancer/broad_wrapper_workflow \
+           pancancer/broad_wrapper_workflow:0.0.1 \
                 seqware bundle launch --dir /workflows/BroadWrapperWorkflow  --engine whitestar --no-metadata --ini /workflow.ini
 ```
