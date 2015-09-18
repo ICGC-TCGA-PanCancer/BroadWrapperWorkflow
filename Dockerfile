@@ -39,10 +39,10 @@ USER seqware
 #ENV NEBULA /workflows/gitroot/nebula
 #ENV PYTHONPATH $PYTHONPATH:$NEBULA
 # so this is how to do this really for within the container
-CMD echo "export PCAWG_DIR=/workflows/gitroot/pcawg_tools">> /home/seqware/.bashrc
-CMD echo "export NEBULA=/workflows/gitroot/nebula">> /home/seqware/.bashrc
-CMD echo "export PYTHONPATH=\$NEBULA">> /home/seqware/.bashrc
-CMD echo "cd; . venv/bin/activate">>/home/seqware/.bashrc
+RUN echo "export PCAWG_DIR=/workflows/gitroot/pcawg_tools">> /home/seqware/.bashrc
+RUN echo "export NEBULA=/workflows/gitroot/nebula">> /home/seqware/.bashrc
+RUN echo "export PYTHONPATH=\$NEBULA">> /home/seqware/.bashrc
+RUN echo "cd; . venv/bin/activate">>/home/seqware/.bashrc
 
 
 #RUN chmod a+w /workflows && \
