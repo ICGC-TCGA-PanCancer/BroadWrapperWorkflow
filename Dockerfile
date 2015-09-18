@@ -14,10 +14,10 @@ RUN pip install requests[security]
 RUN pip install synapseclient pandas
 
 # create an ubuntu user
-RUN adduser --gid 1000 --uid 1000 --home /home/ubuntu ubuntu
+#RUN adduser --gid 1000 --uid 1000 --home /home/ubuntu ubuntu
 
-# now everything else is Ubuntu
-USER ubuntu
+# now everything else is Ubuntu which was renamed to seqware (why!?)
+USER seqware
 
 # TODO, I'm going to mount this in since the Azure instance has a 1TB volume here and the sofware stored here has been tweaked
 # Setup working directories
