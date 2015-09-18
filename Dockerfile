@@ -70,6 +70,6 @@ COPY workflow.properties /home/seqware/gitroot/BroadWrapperWorkflow/workflow.pro
 COPY links /home/seqware/gitroot/BroadWrapperWorkflow/links
 WORKDIR /home/seqware/gitroot/BroadWrapperWorkflow/
 RUN mvn clean package
-RUN cp -R target/Workflow_Bundle_BroadWrapper* /workflows/BroadWrapperWorkflow
-RUN rm -rf target/*
-WORKDIR /workflows/gitroot/
+#RUN cp -R target/Workflow_Bundle_BroadWrapper* /workflows/BroadWrapperWorkflow
+#RUN rm -rf target/*
+WORKDIR /home/seqware/gitroot/
