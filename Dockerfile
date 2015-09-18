@@ -13,6 +13,9 @@ RUN wget https://bootstrap.pypa.io/get-pip.py && \
 RUN pip install requests[security]
 RUN pip install synapseclient pandas
 
+# create an ubuntu user
+RUN adduser --gid 1000 --uid 1000 --home /home/ubuntu ubuntu
+
 # now everything else is Ubuntu
 USER ubuntu
 

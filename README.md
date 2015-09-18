@@ -13,7 +13,7 @@ workflow_dir=/workflows/gitroot/pcawg_tools/pcawg_data.tasks
 container_name=pancancer/pcawg_tools:0.0.1
 ```
 
- 
+
  - `workflow_id` - This is the ID of the workflow file you want to run in this particular instance of BroadWrapperWorkflow. This will be the name of a workflow file in `jobs_dir`.  
  - `workflow_dir` - This is the directory where workflow files will be generated. Normally, this is `$PCAWG_DIR/pcawg_data.tasks` but if you are generating workflow files like this:
 ```
@@ -39,7 +39,7 @@ You will also need to have the container pancancer/pcawg_tools. To build this co
 ```
 $ git clone https://github.com/ICGC-TCGA-PanCancer/pcawg_tools_container.git
 $ cd pcawg_tools_container
-$ docker build -t pancancer/pcawg_tools:0.0.1 .
+$ docker build -t pancancer/broad_wrapper_workflow:0.0.1 .
 ```
 
 Once everything is set up, you can run this workflow:
