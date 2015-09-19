@@ -5,7 +5,7 @@ FROM pancancer/seqware_whitestar_pancancer:1.1.1
 ######################################
 USER root
 RUN apt-get update
-RUN apt-get install -y python wget build-essential python-dev git curl libffi-dev libssl-dev software-properties-common python-software-properties maven
+RUN apt-get install -y python wget build-essential python-virtualenv python-dev git curl libffi-dev libssl-dev software-properties-common python-software-properties maven
 
 # Install some python packages via pip
 RUN wget https://bootstrap.pypa.io/get-pip.py && \

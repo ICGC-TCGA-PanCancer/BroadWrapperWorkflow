@@ -57,7 +57,7 @@ docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
 ```
 -->
 ```
-docker run --rm -it -h master -v /var/run/docker.sock:/var/run/docker.sock \
+docker run --rm -it -h master --name master -v /var/run/docker.sock:/var/run/docker.sock \
                           -v /datastore:/datastore \
                           -v /workflows:/workflows \
                           -v /home/ubuntu/.synapseConfig:/home/seqware/.synapseConfig:ro \
