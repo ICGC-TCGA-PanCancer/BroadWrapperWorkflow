@@ -163,6 +163,24 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 */
         runBroadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service  "+this.workflowDir+"/"+workflowID+" ) ");
         runBroadJob.addParent(previousJob);
+
+        // TODO: need parameters for this
+        // TODO: does the workflowID have workflow_... in it or just the donor ID?
+        Job prepareUpload = this.getWorkflow().createBashJob("prepare_upload");
+        prepareUpload.getCommand().addArgument("( cd $PCAWG_DIR && scripts/pcawg_wf_gen.py upload-prep --rsync boconnor@192.170.233.206:~boconnor/incoming/bulk_upload/ --rsync-key rsync_key.pem "+workflowID+" ) ");
+        prepareUpload.addParent(runBroadJob);
+
+        // TODO: need parameters for this
+        // TODO: need to check error state for each prep
+        Job runPrepUpload = this.getWorkflow().createBashJob("prepare_upload");
+        runPrepUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ) ");
+        runPrepUpload.addParent(runBroadJob);
+
+        // TODO: need parameters for this
+        // TODO: need to check error state for each upload
+        Job doUpload = this.getWorkflow().createBashJob("do_upload");
+        doUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ) ");
+        doUpload.addParent(runPrepUpload);
         
         return runBroadJob;
     }
