@@ -1,7 +1,9 @@
 package io.seqware.pancancer;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import net.sourceforge.seqware.pipeline.workflowV2.AbstractWorkflowDataModel;
 import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
@@ -26,9 +28,26 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private boolean cleanup;
     private boolean checkWorkflowFileExists = false;
     private List<String> uploadSourceDirs = Arrays.asList("muse","broad","broad_tar");
+    
+    private String rsyncUrl;
+    private String rsyncKey;
 
     private String pcawgContainerName ;
 
+    private Map<String,String> workflowProperties  = new HashMap<String,String>(10);
+    
+    private void setMandatoryPropertyFromINI(String propKey) throws Exception
+    {
+        if (hasPropertyAndNotNull(propKey)){
+            //this.workflowDir = getProperty(propKey);
+            workflowProperties.put(propKey, getProperty(propKey));
+        }
+        else
+        {
+            throw new RuntimeException("\""+propKey+"\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+        }
+    }
+    
     private void init() {
         try {
             
@@ -40,29 +59,56 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 //                throw new RuntimeException("\"jobs_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
 //            }
 
-            if (hasPropertyAndNotNull("workflow_dir")){
-                this.workflowDir = getProperty("workflow_dir");
-            }
-            else
-            {
-                throw new RuntimeException("\"workflow_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }
+            //TODO: Refactor all of these property-gets into a single function...
+//            if (hasPropertyAndNotNull("workflow_dir")){
+//                this.workflowDir = getProperty("workflow_dir");
+//            }
+//            else
+//            {
+//                throw new RuntimeException("\"workflow_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+//            }
+            this.setMandatoryPropertyFromINI("workflow_dir");
+            this.workflowDir = this.workflowProperties.get("workflow_dir");
             
-            if (hasPropertyAndNotNull("workflow_id")){
-                this.workflowID = getProperty("workflow_id");
-            }
-            else
-            {
-                throw new RuntimeException("\"workflow_id\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }
+//            if (hasPropertyAndNotNull("workflow_id")){
+//                this.workflowID = getProperty("workflow_id");
+//            }
+//            else
+//            {
+//                throw new RuntimeException("\"workflow_id\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+//            }
+            this.setMandatoryPropertyFromINI("workflow_id");
+            this.workflowDir = this.workflowProperties.get("workflow_id");
 
-            if (hasPropertyAndNotNull("container_name")){
-                this.pcawgContainerName = getProperty("container_name");
-            }
-            else
-            {
-                throw new RuntimeException("\"container_name\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }            
+//            if (hasPropertyAndNotNull("container_name")){
+//                this.pcawgContainerName = getProperty("container_name");
+//            }
+//            else
+//            {
+//                throw new RuntimeException("\"container_name\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+//            }
+            this.setMandatoryPropertyFromINI("container_name");
+            this.workflowDir = this.workflowProperties.get("container_name");
+            
+//            if (hasPropertyAndNotNull("rsync_url")){
+//                this.pcawgContainerName = getProperty("rsync_url");
+//            }
+//            else
+//            {
+//                throw new RuntimeException("\"rsync_url\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+//            }
+            this.setMandatoryPropertyFromINI("rsync_url");
+            this.workflowDir = this.workflowProperties.get("rsync_url");
+            
+//            if (hasPropertyAndNotNull("rsync_key")){
+//                this.pcawgContainerName = getProperty("rsync_key");
+//            }
+//            else
+//            {
+//                throw new RuntimeException("\"rsync_key\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+//            }
+            this.setMandatoryPropertyFromINI("rsync_key");
+            this.workflowDir = this.workflowProperties.get("rsync_key");
             
             //This is optional - if the user doesn't specify, we'll skip the check.
             if (hasPropertyAndNotNull("check_workflowfile_exists")) {
@@ -111,7 +157,9 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // so SeqWare might "succeed" even when Broad fails.
         
         // TODO: Upload steps! Not yet certain if there will be one upload script wrapping the other steps, or if this workflow will call them all separately.
+        Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, runBroad);
         
+        Job executeBroadUploads = this.doUpload(workflowID, broadUploadPrep);
     }
     
 //    private void cleanupWorkflow(Job... lastJobs) {
@@ -164,23 +212,23 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         runBroadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service  "+this.workflowDir+"/"+workflowID+" ) ");
         runBroadJob.addParent(previousJob);
 
-        // TODO: need parameters for this
-        // TODO: does the workflowID have workflow_... in it or just the donor ID?
-        Job prepareUpload = this.getWorkflow().createBashJob("prepare_upload");
-        prepareUpload.getCommand().addArgument("( cd $PCAWG_DIR && scripts/pcawg_wf_gen.py upload-prep --rsync boconnor@192.170.233.206:~boconnor/incoming/bulk_upload/ --rsync-key rsync_key.pem "+workflowID+" ) ");
-        prepareUpload.addParent(runBroadJob);
-
-        // TODO: need parameters for this
-        // TODO: need to check error state for each prep
-        Job runPrepUpload = this.getWorkflow().createBashJob("prepare_upload");
-        runPrepUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ) ");
-        runPrepUpload.addParent(runBroadJob);
-
-        // TODO: need parameters for this
-        // TODO: need to check error state for each upload
-        Job doUpload = this.getWorkflow().createBashJob("do_upload");
-        doUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ) ");
-        doUpload.addParent(runPrepUpload);
+//        // TODO: need parameters for this
+//        // TODO: does the workflowID have workflow_... in it or just the donor ID?
+//        Job prepareUpload = this.getWorkflow().createBashJob("prepare_upload");
+//        prepareUpload.getCommand().addArgument("( cd $PCAWG_DIR && scripts/pcawg_wf_gen.py upload-prep --rsync boconnor@192.170.233.206:~boconnor/incoming/bulk_upload/ --rsync-key rsync_key.pem "+workflowID+" ) ");
+//        prepareUpload.addParent(runBroadJob);
+//
+//        // TODO: need parameters for this
+//        // TODO: need to check error state for each prep
+//        Job runPrepUpload = this.getWorkflow().createBashJob("prepare_upload");
+//        runPrepUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ) ");
+//        runPrepUpload.addParent(runBroadJob);
+//
+//        // TODO: need parameters for this
+//        // TODO: need to check error state for each upload
+//        Job doUpload = this.getWorkflow().createBashJob("do_upload");
+//        doUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ) ");
+//        doUpload.addParent(runPrepUpload);
         
         return runBroadJob;
     }
@@ -202,7 +250,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
         prepareUploadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+" "+workflowID+ " ) ");
         prepareUploadJob.addParent(previousJob);
-        
+        // TODO: Need to find a way to verify successful completion!
         return prepareUploadJob;
     }
     
@@ -211,12 +259,21 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         
         //TODO: Finish this! Need to call muse/prep.sh, muse/upload.sh, broad/prep.sh, broad/upload.sh, broad_tar/prep.sh, broad_tar/upload.sh for the workflow. 
         // Need to figure out what the full path to these will be.
+        Job doAllUploads = this.getWorkflow().createBashJob("begin_all_uploads");
+        // It seems silly to have actual code for a command that's really just a stub... it's probably not even necessary.
+        doAllUploads.getCommand().addArgument("echo \"Begining the upload step\"");
         for (String dir : this.uploadSourceDirs)
         {
             Job doUploadJob = this.getWorkflow().createBashJob("do_upload_command_"+dir);
-            doUploadJob.getCommand().addArgument(dir+"/prep.sh");
-            doUploadJob.getCommand().addArgument(dir+"/upload.sh");
+            //First do the prep script
+            doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && "+workflowID+"/"+dir+"/prep.sh )" );
+            //Then do the upload.
+            doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && "+workflowID+"/"+dir+"/upload.sh )" );
+            //Ensure that this is a child of doAllUploads
+            doUploadJob.addParent(doAllUploads);
         }
-        return null;
+        //doAllUploads is a child of the previous job (running broad workflow!)
+        doAllUploads.addParent(previousJob);
+        return doAllUploads;
     }
 }
