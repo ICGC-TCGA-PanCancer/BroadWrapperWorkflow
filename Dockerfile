@@ -5,16 +5,23 @@ FROM pancancer/seqware_whitestar_pancancer:1.1.1
 ######################################
 USER root
 RUN apt-get update
+
+# The last two lines in this apt-get install is for gt-upload-download-wrapper and vcf-uploader.
 RUN apt-get install -y	python	wget	curl	tabix	git	rsync	maven \
 						python-virtualenv	python-dev	build-essential \
 						libffi-dev	libssl-dev	software-properties-common \
-						python-software-properties	openssh-client
+						python-software-properties	openssh-client \
+						libcurl3 libxqilla6 libboost-program-options1.54.0 libboost-system1.54.0  libboost-filesystem1.54.0 libboost-regex1.54.0 \
+						python-pip libxml-dom-perl libxml-xpath-perl libjson-perl libxml-libxml-perl time libdata-uuid-libuuid-perl libcarp-always-perl libipc-system-simple-perl libdata-uuid-perl vim samtools
 
 # Install some python packages via pip
 RUN wget https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py
+# Installing requets[security] might clean up some of the security warnings seen when installing other packages...
 RUN pip install requests[security]
-RUN pip install synapseclient pandas
+# The last line in this pip install is for gt-upload-download-wrapper and vcf-uploader.
+RUN pip install synapseclient pandas \
+	python-dateutil elasticsearch xmltodict pysftp paramiko
 
 # create an ubuntu user
 #RUN adduser --gid 1000 --uid 1000 --home /home/ubuntu ubuntu
@@ -76,3 +83,35 @@ RUN mvn clean package
 #RUN cp -R target/Workflow_Bundle_BroadWrapper* /workflows/BroadWrapperWorkflow
 #RUN rm -rf target/*
 WORKDIR /home/seqware/gitroot/
+
+############################################
+# Some stuff for gt-download-upload-wrapper
+# and vcf-uploader
+############################################
+
+# #RUN apt-get update && apt-get install -y wget
+# RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb
+# RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb
+# RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-upload_3.8.7-ubuntu2.207-14.04_amd64.deb
+# # Combining these installs with the main apt-get install at the begining of this dockerfile.
+# #RUN apt-get update && apt-get install -y libcurl3 libxqilla6 libboost-program-options1.54.0 libboost-system1.54.0  libboost-filesystem1.54.0 libboost-regex1.54.0 
+# # Install genetorrent
+# RUN cd /opt && dpkg --install genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb genetorrent-upload_3.8.7-ubuntu2.207-14.04_amd64.deb
+# # Get gt-download-upload-wrapper and vcf-uploader
+# RUN mkdir -p /opt/gt-download-upload-wrapper && cd /opt/gt-download-upload-wrapper && wget --no-check-certificate https://github.com/ICGC-TCGA-PanCancer/gt-download-upload-wrapper/archive/2.0.13.tar.gz && tar zxf 2.0.13.tar.gz
+# RUN mkdir -p /opt/vcf-uploader && cd /opt/vcf-uploader && wget --no-check-certificate https://github.com/ICGC-TCGA-PanCancer/vcf-uploader/archive/2.0.7.tar.gz && tar zxf 2.0.7.tar.gz
+# # Combining these installs with the main apt-get install at the begining of this dockerfile.
+# # RUN apt-get update && apt-get install -y python-dev python-pip libxml-dom-perl libxml-xpath-perl libjson-perl libxml-libxml-perl time libdata-uuid-libuuid-perl libcarp-always-perl libipc-system-simple-perl libdata-uuid-perl curl vim samtools tabix
+
+# # Combining these pip installs with the other pip-install earlier in this Dockerfile
+# #RUN pip install synapseclient python-dateutil elasticsearch xmltodict pysftp paramiko
+# # It's probably no longer necessary to manually install sudo - it seems to work fine automatically on more current versions of docker with newer base images.
+# #RUN apt-get update && apt-get install -y sudo
+# # This is probably not necessary since we're basing this container on pancancer/seqware_whitestar_pancancer:1.1.1
+# #RUN useradd seqware
+
+# # Test perl scripts
+# RUN perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/gnos_upload_vcf.pl && \
+#     perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/gnos_download_file.pl && \
+#     perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/get_donors_by_elastic_search.pl && \
+#     perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/synapse_upload_vcf.pl
