@@ -1,8 +1,6 @@
 package io.seqware.pancancer;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import net.sourceforge.seqware.pipeline.workflowV2.AbstractWorkflowDataModel;
@@ -30,7 +28,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private String rsyncUrl;
     private String rsyncKey;
 
-    private Map<String,String> workflowProperties  = new HashMap<String,String>(10);
+    private Map<String,String> workflowProperties  = new HashMap<String,String>(5);
     
     private void setMandatoryPropertyFromINI(String propKey) throws Exception
     {
@@ -53,9 +51,6 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             this.setMandatoryPropertyFromINI("workflow_id");
             this.workflowDir = this.workflowProperties.get("workflow_id");
 
-            this.setMandatoryPropertyFromINI("container_name");
-            this.workflowDir = this.workflowProperties.get("container_name");
-            
             this.setMandatoryPropertyFromINI("rsync_url");
             this.workflowDir = this.workflowProperties.get("rsync_url");
             
