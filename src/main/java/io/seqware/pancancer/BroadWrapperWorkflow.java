@@ -25,14 +25,14 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     //private String jobsDir;
     private String workflowID;
     private String workflowDir;
-    private boolean cleanup;
+    //private boolean cleanup;
     private boolean checkWorkflowFileExists = false;
     private List<String> uploadSourceDirs = Arrays.asList("muse","broad","broad_tar");
     
     private String rsyncUrl;
     private String rsyncKey;
 
-    private String pcawgContainerName ;
+    //private String pcawgContainerName ;
 
     private Map<String,String> workflowProperties  = new HashMap<String,String>(10);
     
@@ -51,62 +51,18 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private void init() {
         try {
             
-//            if (hasPropertyAndNotNull("jobs_dir")){
-//                this.jobsDir = getProperty("jobs_dir");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"jobs_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
-
-            //TODO: Refactor all of these property-gets into a single function...
-//            if (hasPropertyAndNotNull("workflow_dir")){
-//                this.workflowDir = getProperty("workflow_dir");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"workflow_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
             this.setMandatoryPropertyFromINI("workflow_dir");
             this.workflowDir = this.workflowProperties.get("workflow_dir");
             
-//            if (hasPropertyAndNotNull("workflow_id")){
-//                this.workflowID = getProperty("workflow_id");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"workflow_id\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
             this.setMandatoryPropertyFromINI("workflow_id");
             this.workflowDir = this.workflowProperties.get("workflow_id");
 
-//            if (hasPropertyAndNotNull("container_name")){
-//                this.pcawgContainerName = getProperty("container_name");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"container_name\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
             this.setMandatoryPropertyFromINI("container_name");
             this.workflowDir = this.workflowProperties.get("container_name");
             
-//            if (hasPropertyAndNotNull("rsync_url")){
-//                this.pcawgContainerName = getProperty("rsync_url");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"rsync_url\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
             this.setMandatoryPropertyFromINI("rsync_url");
             this.workflowDir = this.workflowProperties.get("rsync_url");
             
-//            if (hasPropertyAndNotNull("rsync_key")){
-//                this.pcawgContainerName = getProperty("rsync_key");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"rsync_key\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
             this.setMandatoryPropertyFromINI("rsync_key");
             this.workflowDir = this.workflowProperties.get("rsync_key");
             
@@ -114,13 +70,6 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             if (hasPropertyAndNotNull("check_workflowfile_exists")) {
                 this.checkWorkflowFileExists = Boolean.valueOf( getProperty("check_workflowfile_exists") );
             }
-//            if (hasPropertyAndNotNull("pcawg_dir")){
-//                this.pcawgDir = getProperty("pcawg_dir");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"pcawg_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
 
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -159,6 +108,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // TODO: Upload steps! Not yet certain if there will be one upload script wrapping the other steps, or if this workflow will call them all separately.
         Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, runBroad);
         
+        @SuppressWarnings("unused")
         Job executeBroadUploads = this.doUpload(workflowID, broadUploadPrep);
     }
     
@@ -264,6 +214,8 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         doAllUploads.getCommand().addArgument("echo \"Begining the upload step\"");
         for (String dir : this.uploadSourceDirs)
         {
+            // Is there any sort of verification that can be done in between each of these steps?
+            
             Job doUploadJob = this.getWorkflow().createBashJob("do_upload_command_"+dir);
             //First do the prep script
             doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && "+workflowID+"/"+dir+"/prep.sh )" );
@@ -273,6 +225,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             doUploadJob.addParent(doAllUploads);
         }
         //doAllUploads is a child of the previous job (running broad workflow!)
+        // Is there any verification that can be done at the very end?
         doAllUploads.addParent(previousJob);
         return doAllUploads;
     }
