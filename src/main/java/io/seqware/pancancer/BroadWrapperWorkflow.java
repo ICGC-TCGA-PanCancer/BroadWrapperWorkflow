@@ -22,17 +22,13 @@ import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
  */
 public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
-    //private String jobsDir;
     private String workflowID;
     private String workflowDir;
     //private boolean cleanup;
     private boolean checkWorkflowFileExists = false;
-    private List<String> uploadSourceDirs = Arrays.asList("muse","broad","broad_tar");
     
     private String rsyncUrl;
     private String rsyncKey;
-
-    //private String pcawgContainerName ;
 
     private Map<String,String> workflowProperties  = new HashMap<String,String>(10);
     
@@ -92,24 +88,22 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // is not a very expensive step with no side-effects and the INI will specify exactly which INI to use.
         Job generateJobs = this.generateWorkflowFilesJob();
 
-        // TODO: Add a bash job to check that the workflow file actually exists where it is supposed to and returns an error code if it does not.
         // The Broad scripts may fail if the file does not exist, but they may
         // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
         Job checkforWFFile = this.checkForWorkflowFile(this.workflowID, generateJobs);
         
         // Run the workflow.
         Job runBroad = this.runBroadWorkflow(this.workflowID, checkforWFFile);
-        //cleanupWorkflow(runBroad);
         
         // TODO: Maybe  have a post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output?
         // It seems like a lot of Broad scripts will exit with code 0 even if they encountered an error (missing input file, HTTP timeout, etc...) and ended
-        // so SeqWare might "succeed" even when Broad fails.
-        
-        // TODO: Upload steps! Not yet certain if there will be one upload script wrapping the other steps, or if this workflow will call them all separately.
+        // so SeqWare might "succeed" even when Broad fails.        
         Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, runBroad);
         
+        Job prep = this.doPrepShellScript(workflowID, broadUploadPrep);
+        
         @SuppressWarnings("unused")
-        Job executeBroadUploads = this.doUpload(workflowID, broadUploadPrep);
+        Job upload = this.doUpload(workflowID,prep);
     }
     
 //    private void cleanupWorkflow(Job... lastJobs) {
@@ -204,17 +198,21 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         return prepareUploadJob;
     }
     
+    private Job doPrepShellScript(String workflowID, Job previousJob)
+    {
+        Job doPrepJob = this.getWorkflow().createBashJob("do_prep_sh");
+        //Do ALL of the prep scripts
+        doPrepJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; )" );
+        doPrepJob.addParent(previousJob);
+        return doPrepJob;
+    }
+    
     private Job doUpload(String workflowID, Job previousJob)
     {
-            
-        Job doUploadJob = this.getWorkflow().createBashJob("do_upload");
-        //First do the prep script
-        doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; )" );
-        //Then do the upload.
+        Job doUploadJob = this.getWorkflow().createBashJob("do_upload_sh");
+        //Do all of the uploads.
         doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; )" );
-        //Ensure that this is a child of doAllUploads
         doUploadJob.addParent(previousJob);
-
         return doUploadJob;
     }
 }
