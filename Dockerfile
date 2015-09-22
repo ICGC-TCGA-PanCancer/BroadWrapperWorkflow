@@ -4,15 +4,38 @@ FROM pancancer/seqware_whitestar_pancancer:1.1.1
 # This part is the PCAWG-tools section
 ######################################
 USER root
+RUN apt-get install software-properties-common  -y
+#RUN add-apt-repository ppa:ubuntu-toolchain-r/test
+# This PPA is needed for libboost stuff in Ubuntu 14
 RUN apt-get update
 
 # The last two lines in this apt-get install is for gt-upload-download-wrapper and vcf-uploader.
-RUN apt-get install -y	python	wget	curl	tabix	git	rsync	maven \
+RUN apt-get install -f -y	python	wget	curl	tabix	git	rsync	maven \
 						python-virtualenv	python-dev	build-essential \
 						libffi-dev	libssl-dev	software-properties-common \
 						python-software-properties	openssh-client \
-						libcurl3 libxqilla6 libboost-program-options1.54.0 libboost-system1.54.0  libboost-filesystem1.54.0 libboost-regex1.54.0 \
+						libcurl3 libxqilla6 \
 						python-pip libxml-dom-perl libxml-xpath-perl libjson-perl libxml-libxml-perl time libdata-uuid-libuuid-perl libcarp-always-perl libipc-system-simple-perl libdata-uuid-perl vim samtools
+						#libc6	libboost-all-dev	libc++-dev	libstdc++6	libgcc1	 \						
+# RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-4.9
+# Installing boost via apt doesn't seem to work, so have to download and install manually
+#RUN cd /opt && wget http://launchpadlibrarian.net/178088943/libboost-program-options1.54.0_1.54.0-4ubuntu3.1_amd64.deb && \
+#				wget http://launchpadlibrarian.net/178089034/libboost-system1.54.0_1.54.0-4ubuntu3.1_i386.deb && \
+#				wget http://launchpadlibrarian.net/178089009/libboost-filesystem1.54.0_1.54.0-4ubuntu3.1_i386.deb && \
+#				wget http://launchpadlibrarian.net/178089028/libboost-regex1.54.0_1.54.0-4ubuntu3.1_i386.deb && \
+#				wget http://mirrors.kernel.org/ubuntu/pool/main/g/gcc-4.8/libstdc++6_4.8.2-19ubuntu1_amd64.deb && \
+#				wget http://security.ubuntu.com/ubuntu/pool/main/i/icu/libicu52_52.1-3ubuntu0.4_amd64.deb && \
+#				wget http://security.ubuntu.com/ubuntu/pool/main/e/eglibc/libc6_2.19-0ubuntu6.6_amd64.deb && \
+#				wget http://mirrors.kernel.org/ubuntu/pool/main/g/gccgo-4.9/libgcc1_4.9-20140406-0ubuntu1_amd64.deb 
+
+# For some reason, I can't get libicu52 to install via apt... 
+#RUN cd /opt && dpkg --install libc6_2.19-0ubuntu6.6_amd64.deb libgcc1_4.9-20140406-0ubuntu1_amd64.deb libstdc++6_4.8.2-19ubuntu1_amd64.deb libicu52_52.1-3ubuntu0.4_amd64.deb
+
+# Now install the libboost components 
+#RUN cd /opt && dpkg --install  libboost-program-options1.54.0_1.54.0-4ubuntu3.1_amd64.deb \
+#                               libboost-system1.54.0_1.54.0-4ubuntu3.1_i386.deb \
+#                               libboost-filesystem1.54.0_1.54.0-4ubuntu3.1_i386.deb \
+#                               libboost-regex1.54.0_1.54.0-4ubuntu3.1_i386.deb
 
 # Install some python packages via pip
 RUN wget https://bootstrap.pypa.io/get-pip.py && \
@@ -22,6 +45,47 @@ RUN pip install requests[security]
 # The last line in this pip install is for gt-upload-download-wrapper and vcf-uploader.
 RUN pip install synapseclient pandas \
 	python-dateutil elasticsearch xmltodict pysftp paramiko
+
+
+
+
+
+############################################
+# Some stuff for gt-download-upload-wrapper
+# and vcf-uploader
+############################################
+
+#RUN apt-get update && apt-get install -y wget
+RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb
+RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb
+RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-upload_3.8.7-ubuntu2.207-14.04_amd64.deb
+# Combining these installs with the main apt-get install at the begining of this dockerfile.
+#RUN apt-get update && apt-get install -y libcurl3 libxqilla6 libboost-program-options1.54.0 libboost-system1.54.0  libboost-filesystem1.54.0 libboost-regex1.54.0 
+# Install genetorrent
+#RUN cd /opt && dpkg --install genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb genetorrent-upload_3.8.7-ubuntu2.207-14.04_amd64.deb
+# Get gt-download-upload-wrapper and vcf-uploader
+#RUN mkdir -p /opt/gt-download-upload-wrapper && cd /opt/gt-download-upload-wrapper && wget --no-check-certificate https://github.com/ICGC-TCGA-PanCancer/gt-download-upload-wrapper/archive/2.0.13.tar.gz && tar zxf 2.0.13.tar.gz
+#RUN mkdir -p /opt/vcf-uploader && cd /opt/vcf-uploader && wget --no-check-certificate https://github.com/ICGC-TCGA-PanCancer/vcf-uploader/archive/2.0.7.tar.gz && tar zxf 2.0.7.tar.gz
+# Combining these installs with the main apt-get install at the begining of this dockerfile.
+# RUN apt-get update && apt-get install -y python-dev python-pip libxml-dom-perl libxml-xpath-perl libjson-perl libxml-libxml-perl time libdata-uuid-libuuid-perl libcarp-always-perl libipc-system-simple-perl libdata-uuid-perl curl vim samtools tabix
+
+# Combining these pip installs with the other pip-install earlier in this Dockerfile
+#RUN pip install synapseclient python-dateutil elasticsearch xmltodict pysftp paramiko
+# It's probably no longer necessary to manually install sudo - it seems to work fine automatically on more current versions of docker with newer base images.
+#RUN apt-get update && apt-get install -y sudo
+# This is probably not necessary since we're basing this container on pancancer/seqware_whitestar_pancancer:1.1.1
+#RUN useradd seqware
+
+# Test perl scripts
+#RUN perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/gnos_upload_vcf.pl && \
+#    perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/gnos_download_file.pl && \
+#    perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/get_donors_by_elastic_search.pl && \
+#    perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/synapse_upload_vcf.pl
+
+
+
+
+
 
 # create an ubuntu user
 #RUN adduser --gid 1000 --uid 1000 --home /home/ubuntu ubuntu
@@ -84,34 +148,3 @@ RUN mvn clean package
 #RUN rm -rf target/*
 WORKDIR /home/seqware/gitroot/
 
-############################################
-# Some stuff for gt-download-upload-wrapper
-# and vcf-uploader
-############################################
-
-# #RUN apt-get update && apt-get install -y wget
-# RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb
-# RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb
-# RUN cd /opt && wget -t 5 --timeout=5 --no-check-certificate https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-upload_3.8.7-ubuntu2.207-14.04_amd64.deb
-# # Combining these installs with the main apt-get install at the begining of this dockerfile.
-# #RUN apt-get update && apt-get install -y libcurl3 libxqilla6 libboost-program-options1.54.0 libboost-system1.54.0  libboost-filesystem1.54.0 libboost-regex1.54.0 
-# # Install genetorrent
-# RUN cd /opt && dpkg --install genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb genetorrent-upload_3.8.7-ubuntu2.207-14.04_amd64.deb
-# # Get gt-download-upload-wrapper and vcf-uploader
-# RUN mkdir -p /opt/gt-download-upload-wrapper && cd /opt/gt-download-upload-wrapper && wget --no-check-certificate https://github.com/ICGC-TCGA-PanCancer/gt-download-upload-wrapper/archive/2.0.13.tar.gz && tar zxf 2.0.13.tar.gz
-# RUN mkdir -p /opt/vcf-uploader && cd /opt/vcf-uploader && wget --no-check-certificate https://github.com/ICGC-TCGA-PanCancer/vcf-uploader/archive/2.0.7.tar.gz && tar zxf 2.0.7.tar.gz
-# # Combining these installs with the main apt-get install at the begining of this dockerfile.
-# # RUN apt-get update && apt-get install -y python-dev python-pip libxml-dom-perl libxml-xpath-perl libjson-perl libxml-libxml-perl time libdata-uuid-libuuid-perl libcarp-always-perl libipc-system-simple-perl libdata-uuid-perl curl vim samtools tabix
-
-# # Combining these pip installs with the other pip-install earlier in this Dockerfile
-# #RUN pip install synapseclient python-dateutil elasticsearch xmltodict pysftp paramiko
-# # It's probably no longer necessary to manually install sudo - it seems to work fine automatically on more current versions of docker with newer base images.
-# #RUN apt-get update && apt-get install -y sudo
-# # This is probably not necessary since we're basing this container on pancancer/seqware_whitestar_pancancer:1.1.1
-# #RUN useradd seqware
-
-# # Test perl scripts
-# RUN perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/gnos_upload_vcf.pl && \
-#     perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/gnos_download_file.pl && \
-#     perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/get_donors_by_elastic_search.pl && \
-#     perl -c -I /opt/gt-download-upload-wrapper/gt-download-upload-wrapper-2.0.13/lib /opt/vcf-uploader/vcf-uploader-2.0.7/synapse_upload_vcf.pl
