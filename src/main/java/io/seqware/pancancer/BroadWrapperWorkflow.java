@@ -206,27 +206,15 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     
     private Job doUpload(String workflowID, Job previousJob)
     {
-        
-        //TODO: Finish this! Need to call muse/prep.sh, muse/upload.sh, broad/prep.sh, broad/upload.sh, broad_tar/prep.sh, broad_tar/upload.sh for the workflow. 
-        // Need to figure out what the full path to these will be.
-        Job doAllUploads = this.getWorkflow().createBashJob("begin_all_uploads");
-        // It seems silly to have actual code for a command that's really just a stub... it's probably not even necessary.
-        doAllUploads.getCommand().addArgument("echo \"Begining the upload step\"");
-        for (String dir : this.uploadSourceDirs)
-        {
-            // Is there any sort of verification that can be done in between each of these steps?
             
-            Job doUploadJob = this.getWorkflow().createBashJob("do_upload_command_"+dir);
-            //First do the prep script
-            doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && "+workflowID+"/"+dir+"/prep.sh )" );
-            //Then do the upload.
-            doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && "+workflowID+"/"+dir+"/upload.sh )" );
-            //Ensure that this is a child of doAllUploads
-            doUploadJob.addParent(doAllUploads);
-        }
-        //doAllUploads is a child of the previous job (running broad workflow!)
-        // Is there any verification that can be done at the very end?
-        doAllUploads.addParent(previousJob);
-        return doAllUploads;
+        Job doUploadJob = this.getWorkflow().createBashJob("do_upload");
+        //First do the prep script
+        doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; )" );
+        //Then do the upload.
+        doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; )" );
+        //Ensure that this is a child of doAllUploads
+        doUploadJob.addParent(previousJob);
+
+        return doUploadJob;
     }
 }
