@@ -22,11 +22,10 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
     private String workflowID;
     private String workflowDir;
-    //private boolean cleanup;
-    private boolean checkWorkflowFileExists = false;
-    
     private String rsyncUrl;
     private String rsyncKey;
+    private String largeWorkDir;
+    private boolean checkWorkflowFileExists = false;
 
     private Map<String,String> workflowProperties  = new HashMap<String,String>(5);
     
@@ -49,13 +48,16 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             this.workflowDir = this.workflowProperties.get("workflow_dir");
             
             this.setMandatoryPropertyFromINI("workflow_id");
-            this.workflowDir = this.workflowProperties.get("workflow_id");
+            this.workflowID = this.workflowProperties.get("workflow_id");
 
             this.setMandatoryPropertyFromINI("rsync_url");
-            this.workflowDir = this.workflowProperties.get("rsync_url");
+            this.rsyncUrl = this.workflowProperties.get("rsync_url");
             
             this.setMandatoryPropertyFromINI("rsync_key");
-            this.workflowDir = this.workflowProperties.get("rsync_key");
+            this.rsyncKey = this.workflowProperties.get("rsync_key");
+
+            this.setMandatoryPropertyFromINI("large_work_dir");
+            this.largeWorkDir = this.workflowProperties.get("large_work_dir");
             
             //This is optional - if the user doesn't specify, we'll skip the check.
             if (hasPropertyAndNotNull("check_workflowfile_exists")) {
@@ -66,14 +68,6 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             throw new RuntimeException(e);
         }
     }
-
-//    @Override
-//    public void setupDirectory() {
-//        // since setupDirectory is the first method run, we use it to initialize variables too.
-//        init();
-//        // creates a dir1 directory in the current working directory where the workflow runs
-//        this.addDirectory(jobsDir);
-//    }
 
     @Override
     public void buildWorkflow() {
@@ -88,102 +82,68 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job checkforWFFile = this.checkForWorkflowFile(this.workflowID, generateJobs);
         
         // Run the workflow.
-        Job runBroad = this.runBroadWorkflow(this.workflowID, checkforWFFile);
-        
-        // TODO: Maybe  have a post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output?
         // It seems like a lot of Broad scripts will exit with code 0 even if they encountered an error (missing input file, HTTP timeout, etc...) and ended
-        // so SeqWare might "succeed" even when Broad fails.        
-        Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, runBroad);
+        // so SeqWare might "succeed" even when Broad fails.
+        Job runBroad = this.runBroadWorkflow(this.workflowID, checkforWFFile);
+
+        // Post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output
+        Job catBroad = this.catBroadLogs(this.workflowID, runBroad);
         
+        // make upload scripts
+        Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, catBroad);
+
+        // prep upload
         Job prep = this.doPrepShellScript(workflowID, broadUploadPrep);
-        
+
+        // actually do rsync upload
         @SuppressWarnings("unused")
         Job upload = this.doUpload(workflowID,prep);
     }
     
-//    private void cleanupWorkflow(Job... lastJobs) {
-//        Job cleanupJob = null;
-//        if (cleanup) {
-//            cleanupJob = this.getWorkflow().createBashJob("cleanup");
-//            // Clean up the jobsDir 
-//            cleanupJob.getCommand().addArgument("rm -Rf "+this.jobsDir+" \n");
-//            // Should cleanup also kill/remove the nebula_galaxy container/other containers?
-//        }
-//        for (Job lastJob : lastJobs) {
-//            if (lastJob != null && cleanupJob != null) {
-//                cleanupJob.addParent(lastJob);
-//            }
-//        }
-//    }
-    
- 
+
     private Job generateWorkflowFilesJob()
     {
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
         // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
         // spawn a subshell and cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
-        generateWFFilesJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.workflowDir + " ) ");
+        generateWFFilesJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.largeWorkDir + " ) ");
         
         return generateWFFilesJob;
+    }
+
+    private Job checkForWorkflowFile(String workflowID, Job previousJob)
+    {
+        Job checkForWorkflowFileJob = this.getWorkflow().createBashJob("check_that_workflow_file_exists");
+        // stat will terminate with exit code "1" if the file is not found.
+        if (this.checkWorkflowFileExists)
+            checkForWorkflowFileJob.getCommand().addArgument("stat "+this.workflowDir+"/workflow_"+workflowID);
+
+        checkForWorkflowFileJob.addParent(previousJob);
+
+        return checkForWorkflowFileJob;
     }
     
     private Job runBroadWorkflow(String workflowID, Job previousJob)
     {
         //Need to execute: qsub sge_qsub_runworkflow.sh pcawg_data.service pcawg_data.tasks/<workflow_id_fill_in>
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
-        
-        // This shouldn't need "sudo" but it won't run without it. :/ 
-/*
-        runBroadJob.getCommand().addArgument("sudo docker run --rm -h master"
-                                                            // Mount the docker socket so that the container can call docker at the top-level
-                                                            +" -v /var/run/docker.sock:/var/run/docker.sock "
-                                                            // Mount the images directory. This directory contains the TAR files for all of the images necessary for running Broad 
-                                                            +" -v /workflows/gitroot/pcawg_tools/images:/workflows/gitroot/pcawg_tools/images:ro "
-                                                            // Mount the service config file - needs to be created when generating workflow files, before this step runs!
-                                                            // NO LONGER NEEDED since workflow file generation now occurs inside the workflow.
-                                                            //+" -v /workflows/gitroot/pcawg_tools/pcawg_data.service:/workflows/gitroot/pcawg_tools/pcawg_data.service:ro"
-                                                            // Mount the datastore, datastore will need to contain "nebula/work"; not certain if nebula needs this already to exist, or if it just needs /datastore and will set up its own directories. 
-                                                            +" -v /datastore:/datastore "
-                                                            // Mount the directory with the work that needs to be done.
-                                                            +" -v " + this.workflowDir+":/tasks "
-                                                            + this.pcawgContainerName+" /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service /tasks/"+workflowID);
-*/
-        runBroadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service  "+this.workflowDir+"/"+workflowID+" ) ");
-        runBroadJob.addParent(previousJob);
 
-//        // TODO: need parameters for this
-//        // TODO: does the workflowID have workflow_... in it or just the donor ID?
-//        Job prepareUpload = this.getWorkflow().createBashJob("prepare_upload");
-//        prepareUpload.getCommand().addArgument("( cd $PCAWG_DIR && scripts/pcawg_wf_gen.py upload-prep --rsync boconnor@192.170.233.206:~boconnor/incoming/bulk_upload/ --rsync-key rsync_key.pem "+workflowID+" ) ");
-//        prepareUpload.addParent(runBroadJob);
-//
-//        // TODO: need parameters for this
-//        // TODO: need to check error state for each prep
-//        Job runPrepUpload = this.getWorkflow().createBashJob("prepare_upload");
-//        runPrepUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ) ");
-//        runPrepUpload.addParent(runBroadJob);
-//
-//        // TODO: need parameters for this
-//        // TODO: need to check error state for each upload
-//        Job doUpload = this.getWorkflow().createBashJob("do_upload");
-//        doUpload.getCommand().addArgument("( cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ) ");
-//        doUpload.addParent(runPrepUpload);
+        runBroadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh pcawg_data.service "+this.workflowDir+"/workflow_"+workflowID+" ) ");
+        runBroadJob.addParent(previousJob);
         
         return runBroadJob;
     }
-    
-    private Job checkForWorkflowFile(String workflowID, Job previousJob)
-    {
-        Job checkForWorkflowFileJob = this.getWorkflow().createBashJob("check_that_workflow_file_exists");
-        // stat will terminate with exit code "1" if the file is not found.
-        if (this.checkWorkflowFileExists)
-            checkForWorkflowFileJob.getCommand().addArgument("stat "+this.workflowDir+"/"+workflowID);
-        
-        checkForWorkflowFileJob.addParent(previousJob);
-        
-        return checkForWorkflowFileJob;
+
+    private Job catBroadLogs(String workflowID, Job previousJob) {
+
+        Job catBroadLogsJob = this.getWorkflow().createBashJob("run_broad_workflow");
+
+        catBroadLogsJob.getCommand().addArgument("( cat " + this.workflowDir + "/workflow_" + workflowID + ".out && cat " + this.workflowDir + "/workflow_" + workflowID + ".err >&2  ) ");
+        catBroadLogsJob.addParent(previousJob);
+
+        return catBroadLogsJob;
     }
-    
+
     private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
     {
         Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
