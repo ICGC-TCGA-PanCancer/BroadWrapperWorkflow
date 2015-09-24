@@ -106,7 +106,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
         // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
         // spawn a subshell and cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
-        generateWFFilesJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.largeWorkDir + " ) ");
+        generateWFFilesJob.getCommand().addArgument("set -e && ( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.largeWorkDir + " ) ");
         
         return generateWFFilesJob;
     }
@@ -128,7 +128,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         //Need to execute: qsub sge_qsub_runworkflow.sh pcawg_data.service pcawg_data.tasks/<workflow_id_fill_in>
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
 
-        runBroadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh pcawg_data.service "+this.workflowDir+"/workflow_"+workflowID+" ) ");
+        runBroadJob.getCommand().addArgument("set -e && ( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh pcawg_data.service "+this.workflowDir+"/workflow_"+workflowID+" ) ");
         runBroadJob.addParent(previousJob);
         
         return runBroadJob;
@@ -138,7 +138,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
         Job catBroadLogsJob = this.getWorkflow().createBashJob("run_broad_workflow");
 
-        catBroadLogsJob.getCommand().addArgument("( cat " + this.workflowDir + "/workflow_" + workflowID + ".out && cat " + this.workflowDir + "/workflow_" + workflowID + ".err >&2  ) ");
+        catBroadLogsJob.getCommand().addArgument("set -e && ( cat " + this.workflowDir + "/workflow_" + workflowID + ".out && cat " + this.workflowDir + "/workflow_" + workflowID + ".err >&2  ) ");
         catBroadLogsJob.addParent(previousJob);
 
         return catBroadLogsJob;
@@ -147,7 +147,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
     {
         Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
-        prepareUploadJob.getCommand().addArgument("( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+" "+workflowID+ " ) ");
+        prepareUploadJob.getCommand().addArgument("set -e && ( cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+" "+workflowID+ " ) ");
         prepareUploadJob.addParent(previousJob);
         // TODO: Need to find a way to verify successful completion!
         return prepareUploadJob;
@@ -157,7 +157,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     {
         Job doPrepJob = this.getWorkflow().createBashJob("do_prep_sh");
         //Do ALL of the prep scripts
-        doPrepJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; )" );
+        doPrepJob.getCommand().addArgument("set -e && ( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; )" );
         doPrepJob.addParent(previousJob);
         return doPrepJob;
     }
@@ -166,7 +166,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     {
         Job doUploadJob = this.getWorkflow().createBashJob("do_upload_sh");
         //Do all of the uploads.
-        doUploadJob.getCommand().addArgument("( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; )" );
+        doUploadJob.getCommand().addArgument("set -e && ( cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; )" );
         doUploadJob.addParent(previousJob);
         return doUploadJob;
     }
