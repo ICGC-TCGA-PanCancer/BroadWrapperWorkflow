@@ -24,6 +24,7 @@ Here is a summary of the steps you need to perform on your host VM:
 * put your various key files in the correct location (cghub, bionimbus, icgc, and rsync pem keys)
 * download various reference files using Kyle's script noted below
 * setup your synapse credentials, get access to the synapse table noted in the above directions, get assignments of donors in this table, more info is in the doc above
+* `sudo mkdir -p /datastore/nebula/work && sudo chmod -R a+rwx /datastore/nebula`
 
 Ensure that the machine you are running this one has the docker images necessary for running Broad saved as tar files (docker\_broad\_variant\_pipeline, docker\_gatk, docker\_genetorrent, docker\_muse, galaxy) in the directory `/workflows/gitroot/pcawg_tools`.
 
@@ -77,14 +78,22 @@ $ docker build -t pancancer/broad_wrapper_workflow:0.0.1 .
 This workflow takes a few configuration options in its INI file:
 
 ```
+# this full path is "/workflows/gitroot/pcawg_tools/pcawg_data.tasks/workflow_CGP_donor_GC00035" but the ID below lacks the "workflow_" prefix
 workflow_id=CGP_donor_GC00036
 workflow_dir=/workflows/gitroot/pcawg_tools/pcawg_data.tasks
+large_work_dir=/datastore/nebula/work
 container_name=pancancer/broad_wrapper_workflow:0.0.1
+check_workflowfile_exists=true
+rsync_url=boconnor@192.170.233.206:~boconnor/incoming/bulk_upload/
+rsync_key=rsync_key.pem
 ```
 
  - `workflow_id` - This is the ID of the workflow file you want to run in this particular instance of BroadWrapperWorkflow. This will be the name of a workflow file in `jobs_dir`.  
- - `workflow_dir` - This is the directory where workflow files will be generated. Normally, this is `$PCAWG_DIR/pcawg_data.tasks` but if you are generating workflow files like this:
+ - `workflow_dir` - This is the directory where workflow files will be generated. Normally, this is `$PCAWG_DIR/pcawg_data.tasks`
+ - `large_work_dir` - location for large files processed in the workflow
  - `container_name` - This is the name of the container to run. This should be set to `pancancer/pcawg_tools:0.0.1`.
+ - `rsync_url` - what to rsync results to
+ - `rsync_key` - the rsync private key file
 
 ## Running the Workflow
 
