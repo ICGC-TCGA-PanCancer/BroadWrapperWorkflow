@@ -102,6 +102,10 @@ RUN echo "export PCAWG_DIR=/workflows/gitroot/pcawg_tools">> /home/seqware/.bash
 RUN echo "export NEBULA=/workflows/gitroot/nebula">> /home/seqware/.bashrc
 RUN echo "export PYTHONPATH=\$NEBULA">> /home/seqware/.bashrc
 
+ENV PCAWG_DIR /workflows/gitroot/pcawg_tools
+ENV NEBULA /workflows/gitroot/nebula
+ENV PYTHONPATH $PYTHONPATH:$NEBULA
+
 # TODO, bring back when bundled inside container
 #RUN chmod a+w /workflows && \
 #    chmod a+w /workflows/gitroot/pcawg_tools && \
