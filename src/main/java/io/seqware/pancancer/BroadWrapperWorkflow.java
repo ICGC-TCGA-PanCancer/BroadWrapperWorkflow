@@ -103,16 +103,20 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
     private Job generateWorkflowFilesJob()
     {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
         // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
         // cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
         generateWFFilesJob.getCommand().addArgument("echo \"PYTHONPATH: $PYTHONPATH PCAWGDIR: $PCAWG_DIR NEBULA: $NEBULA\" && sudo mkdir -p /datastore/nebula/work && sudo chmod -R a+rwx /datastore/nebula && cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.largeWorkDir );
-        
+        generateWFFilesJob.addParent(copySynapseConfig);
         return generateWFFilesJob;
     }
 
     private Job checkForWorkflowFile(String workflowID, Job previousJob)
     {
+        
         Job checkForWorkflowFileJob = this.getWorkflow().createBashJob("check_that_workflow_file_exists");
         // stat will terminate with exit code "1" if the file is not found.
         if (this.checkWorkflowFileExists)
@@ -123,13 +127,32 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         return checkForWorkflowFileJob;
     }
     
+    /*
+     * So... this workflow needs a .synapseConfig. This can come from the .gnos directory on the host machine, which will be mounted to the container.
+     * BUT if a SeqWare step fails and the user tries to restart, they may need to do this step again because we are running SeqWare with docker containers
+     * referencing /datastore, and the ~/.synapseConfig will need to be recreated when re-running a workflow from some step in the middle. 
+     */
+    private Job copyInSynapseConfig()
+    {
+        Job copySynapseConfigFile = this.getWorkflow().createBashJob("copy_synapse_config");
+        
+        //Before doing anything else, .synapseConfig needs to be copied from ~/.gnos to ~/.synapseConfig. it's an ugly hack, treating it like a GNOS key, but it should work.
+        copySynapseConfigFile.getCommand().addArgument("cp /home/seqware/.gnos/.synapseConfig /home/seqware/.synapseConfig");
+        
+        return copySynapseConfigFile;
+    }
+    
     private Job runBroadWorkflow(String workflowID, Job previousJob)
     {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
         //Need to execute: qsub sge_qsub_runworkflow.sh pcawg_data.service pcawg_data.tasks/<workflow_id_fill_in>
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
 
         runBroadJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh pcawg_data.service "+this.workflowDir+"/workflow_"+workflowID);
-        runBroadJob.addParent(previousJob);
+        runBroadJob.addParent(copySynapseConfig);
         
         return runBroadJob;
     }
@@ -146,28 +169,40 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
     private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
     {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
         Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
         prepareUploadJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+" "+workflowID);
-        prepareUploadJob.addParent(previousJob);
+        prepareUploadJob.addParent(copySynapseConfig);
         // TODO: Need to find a way to verify successful completion!
         return prepareUploadJob;
     }
     
     private Job doPrepShellScript(String workflowID, Job previousJob)
     {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
         Job doPrepJob = this.getWorkflow().createBashJob("do_prep_sh");
         //Do ALL of the prep scripts
         doPrepJob.getCommand().addArgument("cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; " );
-        doPrepJob.addParent(previousJob);
+        doPrepJob.addParent(copySynapseConfig);
         return doPrepJob;
     }
     
     private Job doUpload(String workflowID, Job previousJob)
     {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
         Job doUploadJob = this.getWorkflow().createBashJob("do_upload_sh");
         //Do all of the uploads.
         doUploadJob.getCommand().addArgument("cd $PCAWG_DIR/upload && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; " );
-        doUploadJob.addParent(previousJob);
+        doUploadJob.addParent(copySynapseConfig);
         return doUploadJob;
     }
 }
