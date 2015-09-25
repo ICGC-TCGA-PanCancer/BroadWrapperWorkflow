@@ -136,8 +136,8 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     {
         Job copySynapseConfigFile = this.getWorkflow().createBashJob("copy_synapse_config");
         
-        //Before doing anything else, .synapseConfig needs to be copied from ~/.gnos to ~/.synapseConfig. it's an ugly hack, treating it like a GNOS key, but it should work.
-        copySynapseConfigFile.getCommand().addArgument("cp /home/seqware/.gnos/.synapseConfig /home/seqware/.synapseConfig");
+        //Before doing anything else, .synapseConfig needs to be copied from /home/ubuntu/.gnos to ~/.synapseConfig. it's an ugly hack, treating it like a GNOS key, but it should work.
+        copySynapseConfigFile.getCommand().addArgument("cp /home/ubuntu/.gnos/.synapseConfig /home/seqware/.synapseConfig");
         
         return copySynapseConfigFile;
     }

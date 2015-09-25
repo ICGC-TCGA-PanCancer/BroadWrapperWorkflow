@@ -124,3 +124,4 @@ COPY links /home/seqware/gitroot/BroadWrapperWorkflow/links
 WORKDIR /home/seqware/gitroot/BroadWrapperWorkflow/
 RUN mvn clean package
 WORKDIR /home/seqware
+RUN mkdir /home/seqware/.gnos
