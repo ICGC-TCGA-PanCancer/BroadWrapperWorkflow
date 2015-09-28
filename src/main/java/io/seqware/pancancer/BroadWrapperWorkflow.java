@@ -75,7 +75,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         
         setSynapseStatusJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set "+status+" "+workflowID);
         
-        setSynapseStatusJob.addParent(setSynapseStatusJob);
+        setSynapseStatusJob.addParent(previousJob);
         
         return setSynapseStatusJob;
     }
