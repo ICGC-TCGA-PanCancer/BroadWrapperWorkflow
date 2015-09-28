@@ -206,7 +206,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         
         Job doPrepJob = this.getWorkflow().createBashJob("do_prep_sh");
         //Do ALL of the prep scripts
-        doPrepJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done;  || /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set failed "+workflowID);
+        doPrepJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ");
         doPrepJob.addParent(copySynapseConfig);
         return doPrepJob;
     }
@@ -219,7 +219,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         
         Job doUploadJob = this.getWorkflow().createBashJob("do_upload_sh");
         //Do all of the uploads.
-        doUploadJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done;  || /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set failed "+workflowID);
+        doUploadJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ");
         doUploadJob.addParent(copySynapseConfig);
         return doUploadJob;
     }
