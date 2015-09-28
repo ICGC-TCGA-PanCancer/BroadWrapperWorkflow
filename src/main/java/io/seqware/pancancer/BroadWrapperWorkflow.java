@@ -69,6 +69,17 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         }
     }
 
+    private Job setSynapseStatus(Job previousJob, String status, String workflowID)
+    {
+        Job setSynapseStatusJob = this.getWorkflow().createBashJob("set_synapse_status_"+status);
+        
+        setSynapseStatusJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set "+status+" "+workflowID);
+        
+        setSynapseStatusJob.addParent(setSynapseStatusJob);
+        
+        return setSynapseStatusJob;
+    }
+    
     @Override
     public void buildWorkflow() {
         this.init();
@@ -96,8 +107,12 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job prep = this.doPrepShellScript(workflowID, broadUploadPrep);
 
         // actually do rsync upload
-        @SuppressWarnings("unused")
         Job upload = this.doUpload(workflowID,prep);
+        
+        // Now set the status to completed. The workflow IS complete, assuming we got here without any errors or exceptions.
+        @SuppressWarnings("unused")
+        Job setStatusRunning = this.setSynapseStatus(upload, "complete", workflowID);
+
     }
     
 
@@ -148,11 +163,14 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job copySynapseConfig = this.copyInSynapseConfig();
         copySynapseConfig.addParent(previousJob);
         
+        // Now set the status to running.
+        Job setStatusRunning = this.setSynapseStatus(copySynapseConfig, "running", workflowID);
+        
         //Need to execute: qsub sge_qsub_runworkflow.sh pcawg_data.service pcawg_data.tasks/<workflow_id_fill_in>
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
 
         runBroadJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh pcawg_data.service "+this.workflowDir+"/workflow_"+workflowID);
-        runBroadJob.addParent(copySynapseConfig);
+        runBroadJob.addParent(setStatusRunning);
         
         return runBroadJob;
     }
