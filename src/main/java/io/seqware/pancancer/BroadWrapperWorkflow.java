@@ -1,5 +1,8 @@
 package io.seqware.pancancer;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import net.sourceforge.seqware.pipeline.workflowV2.AbstractWorkflowDataModel;
 import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
 
@@ -17,118 +20,207 @@ import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
  */
 public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
-    //private String jobsDir;
     private String workflowID;
     private String workflowDir;
-    private boolean cleanup;
+    private String rsyncUrl;
+    private String rsyncKey;
+    private String largeWorkDir;
+    private boolean checkWorkflowFileExists = false;
 
-    private String pcawgContainerName ;
-
+    private Map<String,String> workflowProperties  = new HashMap<String,String>(5);
+    
+    private void setMandatoryPropertyFromINI(String propKey) throws Exception
+    {
+        if (hasPropertyAndNotNull(propKey)){
+            //this.workflowDir = getProperty(propKey);
+            workflowProperties.put(propKey, getProperty(propKey));
+        }
+        else
+        {
+            throw new RuntimeException("\""+propKey+"\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
+        }
+    }
+    
     private void init() {
         try {
             
-//            if (hasPropertyAndNotNull("jobs_dir")){
-//                this.jobsDir = getProperty("jobs_dir");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"jobs_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
-
-            if (hasPropertyAndNotNull("workflow_dir")){
-                this.workflowDir = getProperty("workflow_dir");
-            }
-            else
-            {
-                throw new RuntimeException("\"workflow_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }
+            this.setMandatoryPropertyFromINI("workflow_dir");
+            this.workflowDir = this.workflowProperties.get("workflow_dir");
             
-            if (hasPropertyAndNotNull("workflow_id")){
-                this.workflowID = getProperty("workflow_id");
-            }
-            else
-            {
-                throw new RuntimeException("\"workflow_id\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }
+            this.setMandatoryPropertyFromINI("workflow_id");
+            this.workflowID = this.workflowProperties.get("workflow_id");
 
-            if (hasPropertyAndNotNull("container_name")){
-                this.pcawgContainerName = getProperty("container_name");
+            this.setMandatoryPropertyFromINI("rsync_url");
+            this.rsyncUrl = this.workflowProperties.get("rsync_url");
+            
+            this.setMandatoryPropertyFromINI("rsync_key");
+            this.rsyncKey = this.workflowProperties.get("rsync_key");
+
+            this.setMandatoryPropertyFromINI("large_work_dir");
+            this.largeWorkDir = this.workflowProperties.get("large_work_dir");
+            
+            //This is optional - if the user doesn't specify, we'll skip the check.
+            if (hasPropertyAndNotNull("check_workflowfile_exists")) {
+                this.checkWorkflowFileExists = Boolean.valueOf( getProperty("check_workflowfile_exists") );
             }
-            else
-            {
-                throw new RuntimeException("\"container_name\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-            }            
-//            if (hasPropertyAndNotNull("pcawg_dir")){
-//                this.pcawgDir = getProperty("pcawg_dir");
-//            }
-//            else
-//            {
-//                throw new RuntimeException("\"pcawg_dir\" was not specified, or it had a null-value; it is NOT an optional parameter, and it is NOT nullable.");
-//            }
 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-//    @Override
-//    public void setupDirectory() {
-//        // since setupDirectory is the first method run, we use it to initialize variables too.
-//        init();
-//        // creates a dir1 directory in the current working directory where the workflow runs
-//        this.addDirectory(jobsDir);
-//    }
-
+    private Job setSynapseStatus(Job previousJob, String status, String workflowID)
+    {
+        Job setSynapseStatusJob = this.getWorkflow().createBashJob("set_synapse_status_"+status);
+        
+        setSynapseStatusJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set "+status+" "+workflowID);
+        
+        setSynapseStatusJob.addParent(previousJob);
+        
+        return setSynapseStatusJob;
+    }
+    
     @Override
     public void buildWorkflow() {
         this.init();
-        // TODO: Add a bash job to check that the workflow file actually exists where it is supposed to and returns an error code if it does not.
+       
+        // Generate workflow files. Yes, we are generating for ALL that are registered for the user with synapse credentials in this machine, but this
+        // is not a very expensive step with no side-effects and the INI will specify exactly which INI to use.
+        Job generateJobs = this.generateWorkflowFilesJob();
+
         // The Broad scripts may fail if the file does not exist, but they may
         // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
+        Job checkforWFFile = this.checkForWorkflowFile(this.workflowID, generateJobs);
         
-        Job runBroad = this.runBroadWorkflow(this.workflowID);
-        //cleanupWorkflow(runBroad);
-        
-        // TODO: Maybe  have a post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output?
+        // Run the workflow.
         // It seems like a lot of Broad scripts will exit with code 0 even if they encountered an error (missing input file, HTTP timeout, etc...) and ended
         // so SeqWare might "succeed" even when Broad fails.
+        Job runBroad = this.runBroadWorkflow(this.workflowID, checkforWFFile);
+
+        // Post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output
+        Job catBroad = this.catBroadLogs(this.workflowID, runBroad);
+        
+        // make upload scripts
+        Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, catBroad);
+
+        // prep upload
+        Job prep = this.doPrepShellScript(workflowID, broadUploadPrep);
+
+        // actually do rsync upload
+        Job upload = this.doUpload(workflowID,prep);
+        
+        // Now set the status to completed. The workflow IS complete, assuming we got here without any errors or exceptions.
+        @SuppressWarnings("unused")
+        Job setStatusRunning = this.setSynapseStatus(upload, "complete", workflowID);
+
     }
     
-//    private void cleanupWorkflow(Job... lastJobs) {
-//        Job cleanupJob = null;
-//        if (cleanup) {
-//            cleanupJob = this.getWorkflow().createBashJob("cleanup");
-//            // Clean up the jobsDir 
-//            cleanupJob.getCommand().addArgument("rm -Rf "+this.jobsDir+" \n");
-//        }
-//        for (Job lastJob : lastJobs) {
-//            if (lastJob != null && cleanupJob != null) {
-//                cleanupJob.addParent(lastJob);
-//            }
-//        }
-//    }
-    
- 
-    private Job runBroadWorkflow(String workflowID/*, Job previousJob*/)
+
+    private Job generateWorkflowFilesJob()
     {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        
+        Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
+        // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
+        // cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
+        generateWFFilesJob.getCommand().addArgument("echo \"PYTHONPATH: $PYTHONPATH PCAWGDIR: $PCAWG_DIR NEBULA: $NEBULA\" && sudo mkdir -p /datastore/nebula/work && sudo chmod -R a+rwx /datastore/nebula && cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.largeWorkDir );
+        generateWFFilesJob.addParent(copySynapseConfig);
+        return generateWFFilesJob;
+    }
+
+    private Job checkForWorkflowFile(String workflowID, Job previousJob)
+    {
+        
+        Job checkForWorkflowFileJob = this.getWorkflow().createBashJob("check_that_workflow_file_exists");
+        // stat will terminate with exit code "1" if the file is not found.
+        if (this.checkWorkflowFileExists)
+            checkForWorkflowFileJob.getCommand().addArgument("stat "+this.workflowDir+"/workflow_"+workflowID);
+
+        checkForWorkflowFileJob.addParent(previousJob);
+
+        return checkForWorkflowFileJob;
+    }
+    
+    /*
+     * So... this workflow needs a .synapseConfig. This can come from the .gnos directory on the host machine, which will be mounted to the container.
+     * BUT if a SeqWare step fails and the user tries to restart, they may need to do this step again because we are running SeqWare with docker containers
+     * referencing /datastore, and the ~/.synapseConfig will need to be recreated when re-running a workflow from some step in the middle. 
+     */
+    private Job copyInSynapseConfig()
+    {
+        Job copySynapseConfigFile = this.getWorkflow().createBashJob("copy_synapse_config");
+        
+        //Before doing anything else, .synapseConfig needs to be copied from /home/ubuntu/.gnos to ~/.synapseConfig. it's an ugly hack, treating it like a GNOS key, but it should work.
+        copySynapseConfigFile.getCommand().addArgument("cp /home/ubuntu/.gnos/.synapseConfig /home/seqware/.synapseConfig");
+        
+        return copySynapseConfigFile;
+    }
+    
+    private Job runBroadWorkflow(String workflowID, Job previousJob)
+    {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
+        // Now set the status to running.
+        Job setStatusRunning = this.setSynapseStatus(copySynapseConfig, "running", workflowID);
+        
         //Need to execute: qsub sge_qsub_runworkflow.sh pcawg_data.service pcawg_data.tasks/<workflow_id_fill_in>
         Job runBroadJob = this.getWorkflow().createBashJob("run_broad_workflow");
-        
-        // This shouldn't need "sudo" but it won't run without it. :/ 
-        runBroadJob.getCommand().addArgument("sudo docker run --rm -h master"
-                                                            // Mount the docker socket so that the container can call docker at the top-level
-                                                            +" -v /var/run/docker.sock:/var/run/docker.sock "
-                                                            // Mount the images directory. This directory contains the TAR files for all of the images necessary for running Broad 
-                                                            +" -v /workflows/gitroot/pcawg_tools/images:/workflows/gitroot/pcawg_tools/images:ro "
-                                                            // Mount the service config file - needs to be created when generating workflow files, before this step runs!
-                                                            +" -v /workflows/gitroot/pcawg_tools/pcawg_data.service:/workflows/gitroot/pcawg_tools/pcawg_data.service:ro"
-                                                            // Mount the datastore, datastore will need to contain "nebula/work"; not certain if nebula needs this already to exist, or if it just needs /datastore and will set up its own directories. 
-                                                            +" -v /datastore:/datastore "
-                                                            // Mount the directory with the work that needs to be done.
-                                                            +" -v " + this.workflowDir+":/tasks "
-                                                            + this.pcawgContainerName+" /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh  pcawg_data.service /tasks/"+workflowID);
-        //runBroadJob.addParent(previousJob);
+
+        runBroadJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/sge_qsub_runworkflow.sh pcawg_data.service "+this.workflowDir+"/workflow_"+workflowID + " || /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set failed "+workflowID);
+        runBroadJob.addParent(setStatusRunning);
         
         return runBroadJob;
+    }
+
+    private Job catBroadLogs(String workflowID, Job previousJob) {
+
+        Job catBroadLogsJob = this.getWorkflow().createBashJob("run_broad_workflow");
+
+        catBroadLogsJob.getCommand().addArgument("cat " + this.workflowDir + "/workflow_" + workflowID + ".out && cat " + this.workflowDir + "/workflow_" + workflowID + ".err >&2  ");
+        catBroadLogsJob.addParent(previousJob);
+
+        return catBroadLogsJob;
+    }
+
+    private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
+    {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
+        Job prepareUploadJob = this.getWorkflow().createBashJob("prepare_upload");
+        prepareUploadJob.getCommand().addArgument("cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py upload-prep --rsync "+rsyncURL+" --rsync-key "+rsyncKey+" "+workflowID + " || /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set failed "+workflowID);
+        prepareUploadJob.addParent(copySynapseConfig);
+        // TODO: Need to find a way to verify successful completion!
+        return prepareUploadJob;
+    }
+    
+    private Job doPrepShellScript(String workflowID, Job previousJob)
+    {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
+        Job doPrepJob = this.getWorkflow().createBashJob("do_prep_sh");
+        //Do ALL of the prep scripts
+        doPrepJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ");
+        doPrepJob.addParent(copySynapseConfig);
+        return doPrepJob;
+    }
+    
+    private Job doUpload(String workflowID, Job previousJob)
+    {
+        // Copy the synapse config file
+        Job copySynapseConfig = this.copyInSynapseConfig();
+        copySynapseConfig.addParent(previousJob);
+        
+        Job doUploadJob = this.getWorkflow().createBashJob("do_upload_sh");
+        //Do all of the uploads.
+        doUploadJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ");
+        doUploadJob.addParent(copySynapseConfig);
+        return doUploadJob;
     }
 }
