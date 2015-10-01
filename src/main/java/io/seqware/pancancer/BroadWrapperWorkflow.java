@@ -26,6 +26,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private String rsyncKey;
     private String largeWorkDir;
     private boolean checkWorkflowFileExists = false;
+    private String badRepos;
 
     private Map<String,String> workflowProperties  = new HashMap<String,String>(5);
     
@@ -64,6 +65,11 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
                 this.checkWorkflowFileExists = Boolean.valueOf( getProperty("check_workflowfile_exists") );
             }
 
+            //This is optional - There might be days where no repos are black-listed. ;)
+            if (hasPropertyAndNotNull("bad_repos")) {
+                this.badRepos = getProperty("bad_repos");
+            }
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -92,10 +98,13 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // not return a non-zero error code, so this workflow will finish very quickly and *appear* successful when it is not.
         Job checkforWFFile = this.checkForWorkflowFile(this.workflowID, generateJobs);
         
+        // Before we run the workflow, we need to update the workflow file to get rid of any black-listed repositories.
+        Job rmBlacklistedRepos = this.removeBlacklistedRepositories(this.workflowID, this.badRepos,checkforWFFile);
+        
         // Run the workflow.
         // It seems like a lot of Broad scripts will exit with code 0 even if they encountered an error (missing input file, HTTP timeout, etc...) and ended
         // so SeqWare might "succeed" even when Broad fails.
-        Job runBroad = this.runBroadWorkflow(this.workflowID, checkforWFFile);
+        Job runBroad = this.runBroadWorkflow(this.workflowID, rmBlacklistedRepos);
 
         // Post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output
         Job catBroad = this.catBroadLogs(this.workflowID, runBroad);
@@ -119,6 +128,16 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     }
     
 
+    private Job removeBlacklistedRepositories(String workflowId, String blacklist, Job previousJob) {
+        Job removeBadReposJob = this.getWorkflow().createBashJob("remove_blacklist_repos");
+        
+        String pathToScript = this.getWorkflow().getWorkflowBundleDir()+"/bin/remove_bad_repo.py";
+        
+        removeBadReposJob.getCommand().addArgument("stat "+pathToScript+" && chmod a+x "+pathToScript + " && "+pathToScript+ " \""+blacklist+"\" /workflows/gitroot/pcawg_data.tasks/"+workflowId);
+        
+        return removeBadReposJob;
+    }
+
     private Job generateWorkflowFilesJob()
     {
         // Copy the synapse config file
@@ -127,6 +146,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job generateWFFilesJob = this.getWorkflow().createBashJob("generate_broad_workflow_files");
         // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
         // cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
+        //FIXME: Fix this so that it is not mkdir hard-coded paths!! Either force user to stick with /datastore/nebula/work or allow them to specify something. Also, is this supposed to be the same as the workDir argument or is it something else?
         generateWFFilesJob.getCommand().addArgument("echo \"PYTHONPATH: $PYTHONPATH PCAWGDIR: $PCAWG_DIR NEBULA: $NEBULA\" && sudo mkdir -p /datastore/nebula/work && sudo chmod -R a+rwx /datastore/nebula && cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --ref-download --create-service --work-dir "+this.largeWorkDir );
         generateWFFilesJob.addParent(copySynapseConfig);
         return generateWFFilesJob;
