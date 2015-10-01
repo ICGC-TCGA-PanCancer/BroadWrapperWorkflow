@@ -131,9 +131,12 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private Job removeBlacklistedRepositories(String workflowId, String blacklist, Job previousJob) {
         Job removeBadReposJob = this.getWorkflow().createBashJob("remove_blacklist_repos");
         
-        String pathToScript = this.getWorkflow().getWorkflowBundleDir()+"/bin/remove_bad_repo.py";
+        //TODO: Find a way to get the python script to be deployed with the workflow bundle... simply dropping it into workflow/bin didn't seem to work, 
+        // so hard-code the path to the location on the base image for now. 
+        String pathToScript = "/workflows/gitroot/BroadWrapperWorkflow/workflow/bin/remove_bad_repo.py";
         
         removeBadReposJob.getCommand().addArgument("stat "+pathToScript+" && chmod a+x "+pathToScript + " && "+pathToScript+ " \""+blacklist+"\" /workflows/gitroot/pcawg_data.tasks/"+workflowId);
+        removeBadReposJob.addParent(previousJob);
         
         return removeBadReposJob;
     }
