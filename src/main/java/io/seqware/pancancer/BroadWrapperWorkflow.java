@@ -190,8 +190,10 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
     private Job checkGalaxyErrs(Job previousJob) {
         Job checkGalaxyErrsJob = this.getWorkflow().createBashJob("cat_galaxy_errs");
-        
-        checkGalaxyErrsJob.getCommand().addArgument("cd $PCAWG_DIR && scripts/pcawg_wf_gen.py errors --full > galaxy.err && cat galaxy.err");
+        // 250 hours should be a reasonable limit. There appear to be some old errors in the image that I can't get rid of.
+        // At the time of writing, (2015-10-01, the oldest appears to be from late September so ~250 hours will exclude it. Later images could
+        // have larger limits to better capture errors from very long running workflows.
+        checkGalaxyErrsJob.getCommand().addArgument("cd $PCAWG_DIR && scripts/pcawg_wf_gen.py errors --full --within 250 > galaxy.err && cat galaxy.err");
         checkGalaxyErrsJob.addParent(previousJob);
         return checkGalaxyErrsJob;
     }
