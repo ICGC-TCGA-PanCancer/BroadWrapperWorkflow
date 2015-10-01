@@ -100,16 +100,19 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // Post-Broad step that outputs the <WORKFLOWID>.err and <WORKFLOWID>.out files so that they are a part of the seqware output
         Job catBroad = this.catBroadLogs(this.workflowID, runBroad);
         
+        // Post-Broad step to check the galaxy errors
+        Job checkGalaxyErrs = this.checkGalaxyErrs(catBroad);
+        
         // make upload scripts
-        Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, catBroad);
-
+        Job broadUploadPrep = this.prepareUpload(workflowID, this.rsyncUrl, this.rsyncKey, checkGalaxyErrs);
+        
         // prep upload
         Job prep = this.doPrepShellScript(workflowID, broadUploadPrep);
 
         // actually do rsync upload
         Job upload = this.doUpload(workflowID,prep);
         
-        // Now set the status to completed. The workflow IS complete, assuming we got here without any errors or exceptions.
+        // Now set the status to "complete". The workflow IS complete, assuming we got here without any errors or exceptions.
         @SuppressWarnings("unused")
         Job setStatusRunning = this.setSynapseStatus(upload, "complete", workflowID);
 
@@ -177,14 +180,22 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
 
     private Job catBroadLogs(String workflowID, Job previousJob) {
 
-        Job catBroadLogsJob = this.getWorkflow().createBashJob("run_broad_workflow");
+        Job catBroadLogsJob = this.getWorkflow().createBashJob("cat_workflow_broad_logs");
 
-        catBroadLogsJob.getCommand().addArgument("cat " + this.workflowDir + "/workflow_" + workflowID + ".out && cat " + this.workflowDir + "/workflow_" + workflowID + ".err >&2  ");
+        catBroadLogsJob.getCommand().addArgument("echo \"***** WORKFLOW_OUT_LOG *****\" && cat " + this.workflowDir + "/workflow_" + workflowID + ".out && echo \"***** WORKFLOW_ERR_LOG ***** \" && cat " + this.workflowDir + "/workflow_" + workflowID + ".err >&2  ");
         catBroadLogsJob.addParent(previousJob);
 
         return catBroadLogsJob;
     }
 
+    private Job checkGalaxyErrs(Job previousJob) {
+        Job checkGalaxyErrsJob = this.getWorkflow().createBashJob("cat_galaxy_errs");
+        
+        checkGalaxyErrsJob.getCommand().addArgument("cd $PCAWG_DIR && scripts/pcawg_wf_gen.py errors --full > galaxy.err && cat galaxy.err");
+        checkGalaxyErrsJob.addParent(previousJob);
+        return checkGalaxyErrsJob;
+    }
+    
     private Job prepareUpload(String workflowID, String rsyncURL, String rsyncKey, Job previousJob)
     {
         // Copy the synapse config file
@@ -198,16 +209,25 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         return prepareUploadJob;
     }
     
+    
     private Job doPrepShellScript(String workflowID, Job previousJob)
     {
         // Copy the synapse config file
         Job copySynapseConfig = this.copyInSynapseConfig();
         copySynapseConfig.addParent(previousJob);
         
+        // First, check that the prep.sh script actually exists
+        Job checkPrepScriptExists = this.getWorkflow().createBashJob("check_prep_sh_exists");
+        // Mark as "failed" in Synapse if no prep.sh script was generated. Since some of the earlier steps may not propagate their error code correctly, 
+        // we might be uncertain about errors until this step.
+        checkPrepScriptExists.getCommand().addArgument("cd $PCAWG_DIR && stat upload/*/"+workflowID+"/*/prep.sh || /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set failed "+workflowID);
+        checkPrepScriptExists.addParent(copySynapseConfig);
+        
+        
         Job doPrepJob = this.getWorkflow().createBashJob("do_prep_sh");
         //Do ALL of the prep scripts
         doPrepJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/prep.sh; do bash $i; done; ");
-        doPrepJob.addParent(copySynapseConfig);
+        doPrepJob.addParent(checkPrepScriptExists);
         return doPrepJob;
     }
     
@@ -217,10 +237,18 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job copySynapseConfig = this.copyInSynapseConfig();
         copySynapseConfig.addParent(previousJob);
         
+        // First, check that the upload.sh script actually exists
+        Job checkUploadScriptExists = this.getWorkflow().createBashJob("check_upload_sh_exists");
+        // Mark as "failed" in Synapse if no upload.sh script was generated. Since some of the earlier steps may not propagate their error code correctly, 
+        // we might be uncertain about errors until this step.
+        checkUploadScriptExists.getCommand().addArgument("cd $PCAWG_DIR && stat upload/*/"+workflowID+"/*/upload.sh || /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py set failed "+workflowID);
+        checkUploadScriptExists.addParent(copySynapseConfig);
+
+        
         Job doUploadJob = this.getWorkflow().createBashJob("do_upload_sh");
         //Do all of the uploads.
         doUploadJob.getCommand().addArgument("cd $PCAWG_DIR && for i in upload/*/"+workflowID+"/*/upload.sh; do bash $i; done; ");
-        doUploadJob.addParent(copySynapseConfig);
+        doUploadJob.addParent(checkUploadScriptExists);
         return doUploadJob;
     }
 }
