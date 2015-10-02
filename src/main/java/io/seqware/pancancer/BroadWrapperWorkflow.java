@@ -26,7 +26,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     private String rsyncKey;
     private String largeWorkDir;
     private boolean checkWorkflowFileExists = false;
-    private String badRepos;
+//    private String badRepos;
 
     private Map<String,String> workflowProperties  = new HashMap<String,String>(5);
     
@@ -66,9 +66,9 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
             }
 
             //This is optional - There might be days where no repos are black-listed. ;)
-            if (hasPropertyAndNotNull("bad_repos")) {
-                this.badRepos = getProperty("bad_repos");
-            }
+//            if (hasPropertyAndNotNull("bad_repos")) {
+//                this.badRepos = getProperty("bad_repos");
+//            }
 
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -99,7 +99,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         Job checkforWFFile = this.checkForWorkflowFile(this.workflowID, generateJobs);
         
         // Before we run the workflow, we need to update the workflow file to get rid of any black-listed repositories.
-        Job rmBlacklistedRepos = this.removeBlacklistedRepositories(this.workflowID, this.badRepos,checkforWFFile);
+        Job rmBlacklistedRepos = this.removeBlacklistedRepositories(this.workflowID,checkforWFFile);
         
         // Run the workflow.
         // It seems like a lot of Broad scripts will exit with code 0 even if they encountered an error (missing input file, HTTP timeout, etc...) and ended
@@ -128,14 +128,14 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
     }
     
 
-    private Job removeBlacklistedRepositories(String workflowId, String blacklist, Job previousJob) {
+    private Job removeBlacklistedRepositories(String workflowId, Job previousJob) {
         Job removeBadReposJob = this.getWorkflow().createBashJob("remove_blacklist_repos");
         
         //TODO: Find a way to get the python script to be deployed with the workflow bundle... simply dropping it into workflow/bin didn't seem to work, 
         // so hard-code the path to the location on the base image for now. 
         String pathToScript = "/workflows/gitroot/BroadWrapperWorkflow/workflow/bin/remove_bad_repo.py";
         
-        removeBadReposJob.getCommand().addArgument("stat "+pathToScript+" && chmod a+x "+pathToScript + " && "+pathToScript+ " \""+blacklist+"\" /workflows/gitroot/pcawg_data.tasks/"+workflowId);
+        removeBadReposJob.getCommand().addArgument("stat "+pathToScript+" && chmod a+x "+pathToScript + " && "+pathToScript+ " /workflows/gitroot/pcawg_data.tasks/"+workflowId);
         removeBadReposJob.addParent(previousJob);
         
         return removeBadReposJob;
