@@ -135,7 +135,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // so hard-code the path to the location on the base image for now. 
         String pathToScript = "/workflows/gitroot/BroadWrapperWorkflow/workflow/bin/remove_bad_repo.py";
         
-        removeBadReposJob.getCommand().addArgument("stat "+pathToScript+" && chmod a+x "+pathToScript + " && "+pathToScript+ " /workflows/gitroot/pcawg_data.tasks/"+workflowId);
+        removeBadReposJob.getCommand().addArgument("stat "+pathToScript+" && chmod a+x "+pathToScript + " && "+pathToScript+ " /workflows/gitroot/pcawg_data.tasks/workflow_"+workflowId);
         removeBadReposJob.addParent(previousJob);
         
         return removeBadReposJob;

@@ -19,7 +19,7 @@ for line in lines:
     if not line.startswith('#') and line != '':
         bad_repos = bad_repos + 'gtrepo-'+line+'.annailabs.com' + ','
 
-print('repo list is: '+bad_repos)
+print('repo blacklist is: '+bad_repos)
 
 if bad_repos != '':
     path_to_workflow_file = sys.argv[1]
