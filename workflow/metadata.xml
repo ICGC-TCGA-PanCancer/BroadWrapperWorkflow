@@ -1,4 +1,4 @@
-<bundle version="0.0.1-SNAPSHOT">
+<bundle version="1.1.0">
   <workflow name="BroadWrapper" version="${workflow-version}" seqware_version="${seqware-version}"
   basedir="${workflow_bundle_dir}/Workflow_Bundle_BroadWrapper/${workflow-version}">
     <description>${workflow-description}</description>
