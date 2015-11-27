@@ -150,7 +150,7 @@ public class BroadWrapperWorkflow extends AbstractWorkflowDataModel {
         // The PCAWG tool scripts sometimes experience path confusion when they are called from a generated seqware datatore directory. So, we will
         // cd to $PCAWG_DIR, and then call the pcawg_wf_gen.py script.
         //FIXME: Fix this so that it is not mkdir hard-coded paths!! Either force user to stick with /datastore/nebula/work or allow them to specify something. Also, is this supposed to be the same as the workDir argument or is it something else?
-        generateWFFilesJob.getCommand().addArgument("echo \"PYTHONPATH: $PYTHONPATH PCAWGDIR: $PCAWG_DIR NEBULA: $NEBULA\" && sudo mkdir -p /datastore/nebula/work && sudo chmod -R a+rwx /datastore/nebula && cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --timeout 180 --ref-download --create-service --work-dir "+this.largeWorkDir );
+        generateWFFilesJob.getCommand().addArgument("echo \"PYTHONPATH: $PYTHONPATH PCAWGDIR: $PCAWG_DIR NEBULA: $NEBULA\" && sudo mkdir -p /datastore/nebula/work && sudo chmod -R a+rwx /datastore/nebula && cd $PCAWG_DIR && /workflows/gitroot/pcawg_tools/scripts/pcawg_wf_gen.py gen --timeout 300 --ref-download --create-service --work-dir "+this.largeWorkDir );
         generateWFFilesJob.addParent(copySynapseConfig);
         return generateWFFilesJob;
     }
